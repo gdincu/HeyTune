@@ -93,6 +93,12 @@ jobs:
       - name: Make gradlew executable (Windows checkouts lose +x)
         run: chmod +x heytune/gradlew
 
+      - name: Verify staged native engine (must exist before CMake configure)
+        run: |
+          ls -la heytune/handsfree/engine/android-arm64/ heytune/handsfree/engine/android-armv7/
+          test -f heytune/handsfree/engine/android-arm64/libneedle.a
+          test -f heytune/handsfree/engine/android-armv7/libneedle.a
+
       # handsfree unit tests removed from CI to keep debug-APK runs fast
       # (~1m34s saved). Run locally when touching handsfree/:
       #   cd heytune && ./gradlew :handsfree:testDebugUnitTest

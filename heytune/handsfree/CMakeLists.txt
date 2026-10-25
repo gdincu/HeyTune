@@ -28,8 +28,11 @@ if(CACTUS_ABI)
   target_include_directories(needle_bridge PRIVATE ${NEEDLE_ENGINE_DIR}/${CACTUS_ABI})
 
   # libneedle.a ships per-ABI next to needle.h in the platform folder.
-  find_library(NEEDLE_LIB needle PATHS ${NEEDLE_ENGINE_DIR}/${CACTUS_ABI} NO_DEFAULT_PATH)
-  if(NEEDLE_LIB)
+  # Use an explicit path (not find_library): the file is staged by CI
+  # (`needle download`) and must exist at configure time.
+  set(NEEDLE_LIB "${NEEDLE_ENGINE_DIR}/${CACTUS_ABI}/libneedle.a")
+  if(EXISTS "${NEEDLE_LIB}")
+    message(STATUS "Linking prebuilt engine: ${NEEDLE_LIB}")
     target_link_libraries(needle_bridge ${NEEDLE_LIB} log)
   else()
     message(WARNING "libneedle.a not found in ${NEEDLE_ENGINE_DIR}/${CACTUS_ABI}; run the engine download step first.")
