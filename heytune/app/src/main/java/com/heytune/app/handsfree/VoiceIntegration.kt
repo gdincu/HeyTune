@@ -46,16 +46,23 @@ object VoiceIntegration {
 
     private var micPermissionLauncher: ActivityResultLauncher<String>? = null
     private var pendingStart = false
+    private var pendingListenOnce = false
 
     fun attach(activity: MainActivity) {
         micPermissionLauncher = activity.registerForActivityResult(
             ActivityResultContracts.RequestPermission(),
         ) { granted ->
+            if (granted && pendingListenOnce) {
+                pendingListenOnce = false
+                listenOnce(activity)
+                return@registerForActivityResult
+            }
             if (granted && pendingStart) {
                 pendingStart = false
                 activity.lifecycleScope.launch { startVoice(activity) {} }
             } else if (!granted) {
                 pendingStart = false
+                pendingListenOnce = false
                 Toast.makeText(
                     activity,
                     activity.getString(R.string.voice_mic_denied),
@@ -128,6 +135,28 @@ object VoiceIntegration {
         }
     }
 
+    /**
+     * One-shot voice command (e.g. steering-wheel assistant button or the
+     * notification "Listen" action): same model prep as driving mode, then a
+     * single wake-free window. The service stops itself afterwards unless
+     * driving mode is on. Never touches the driving-mode setting.
+     */
+    fun listenOnce(activity: MainActivity) {
+        activity.lifecycleScope.launch {
+            if (!hasMicPermission(activity)) {
+                pendingListenOnce = true
+                micPermissionLauncher?.launch(Manifest.permission.RECORD_AUDIO)
+                return@launch
+            }
+            if (prepareModels(activity)) {
+                activity.startService(
+                    Intent(activity, VoiceService::class.java)
+                        .setAction(VoiceService.ACTION_LISTEN_ONCE),
+                )
+            }
+        }
+    }
+
     // -- internals ----------------------------------------------------------
 
     private fun hasMicPermission(activity: MainActivity): Boolean =
@@ -136,43 +165,53 @@ object VoiceIntegration {
             Manifest.permission.RECORD_AUDIO,
         ) == PackageManager.PERMISSION_GRANTED
 
+    /**
+     * Shared model prep: download + load. Returns false on failure (toast
+     * shown). No state changes: callers decide what flags to set, so the
+     * button path never touches the driving-mode setting.
+     */
+    private suspend fun prepareModels(
+        activity: MainActivity,
+        onProgress: (fraction: Float) -> Unit = {},
+    ): Boolean = withContext(Dispatchers.IO) {
+        try {
+            if (!ModelManager.modelsReady(activity)) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(
+                        activity,
+                        activity.getString(R.string.voice_downloading_models),
+                        Toast.LENGTH_LONG,
+                    ).show()
+                }
+                ModelManager.downloadMissing(activity) { f, _ ->
+                    activity.runOnUiThread { onProgress(f) }
+                }
+            }
+            val toolsJson = activity.assets
+                .open("handsfree_tools.json")
+                .bufferedReader()
+                .use { it.readText() }
+            ModelManager.ensureLoaded(activity, toolsJson)
+        } catch (e: Exception) {
+            Log.w(TAG, "model download/load failed", e)
+            withContext(Dispatchers.Main) {
+                Toast.makeText(
+                    activity,
+                    activity.getString(R.string.voice_models_failed),
+                    Toast.LENGTH_LONG,
+                ).show()
+            }
+            false
+        }
+    }
+
     private suspend fun startVoice(
         activity: MainActivity,
         onProgress: (fraction: Float) -> Unit = {},
         onDone: (ok: Boolean) -> Unit = {},
     ) {
         if (!hasMicPermission(activity)) return
-        val ok = withContext(Dispatchers.IO) {
-            try {
-                if (!ModelManager.modelsReady(activity)) {
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(
-                            activity,
-                            activity.getString(R.string.voice_downloading_models),
-                            Toast.LENGTH_LONG,
-                        ).show()
-                    }
-                    ModelManager.downloadMissing(activity) { f, _ ->
-                        activity.runOnUiThread { onProgress(f) }
-                    }
-                }
-                val toolsJson = activity.assets
-                    .open("handsfree_tools.json")
-                    .bufferedReader()
-                    .use { it.readText() }
-                ModelManager.ensureLoaded(activity, toolsJson)
-            } catch (e: Exception) {
-                Log.w(TAG, "model download/load failed", e)
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(
-                        activity,
-                        activity.getString(R.string.voice_models_failed),
-                        Toast.LENGTH_LONG,
-                    ).show()
-                }
-                false
-            }
-        }
+        val ok = prepareModels(activity, onProgress)
         if (!ok) {
             withContext(Dispatchers.IO) {
                 activity.dataStore.edit { it[VoiceDrivingModeKey] = false }

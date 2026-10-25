@@ -1,6 +1,6 @@
 # HeyTune — hands-free music player (Whistle STT + Needle function calling)
 
-Say **"hey tune"** while driving to **play a song / pause / resume / next /
+Press your steering-wheel button while driving to **play a song / pause / resume / next /
 previous / volume / shuffle / like** — fully on-device, no network, using:
 
 - [Whistle](https://cactuscompute.com/blog/whistle) — 16.9 MB on-device speech-to-text (7 languages, 11 ms to first token)
@@ -74,13 +74,10 @@ python python\cli.py mic
 
 1. Player → Settings → **Hands-free driving mode** on (mic permission →
    downloads `whistle.cact` + `needle3.cact` once, ~45 MB).
-2. `VoiceService` records 16 kHz mono; energy VAD opens a ≤10 s window;
-   Whistle transcribes; the wake phrase `hey tune` (word-boundary matched,
-   so "they"/"whey" — and bare "hey" — don't trigger) is required — music/cabin
-   audio without it is ignored, and a bare "hey tune" with no command is dropped
-   before any Needle call. `hey tune` is far rarer in chat/lyrics than bare
-   `hey`, so expect few activations, and the guards above keep the rest
-   cheap and silent.
+2. Press your steering-wheel assistant button (or the 🎤 notification
+   action) and speak a command — no wake phrase needed. The mic opens
+   only for that window (≤10 s audio, ends on ~1.2 s silence), then the
+   service stops itself. Nothing is always listening.
 3. `needle_complete(audio)` → tool calls; `confidence ≥ 0.50` executes,
    otherwise a confirm notification/TTS, otherwise the offline regex fallback.
    If model and fallback agree on a low-confidence call, it executes

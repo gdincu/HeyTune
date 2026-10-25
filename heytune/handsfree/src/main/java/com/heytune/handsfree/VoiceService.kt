@@ -3,6 +3,7 @@ package com.heytune.handsfree
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.media.AudioAttributes
@@ -12,23 +13,24 @@ import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.os.Build
 import android.os.IBinder
+import android.os.SystemClock
 import androidx.core.app.NotificationCompat
 
 /**
- * Always-on hands-free service for driving.
+ * Button-triggered hands-free service for driving (no always-on listening).
  *
  * Loop (all on-device, no network):
- *  1. AudioRecord 16kHz mono, 80ms frames; VAD gates Whistle.
- *  2. On speech: buffer until ~1.2s silence, transcribe via NeedleBridge.
- *  3. Require wake phrase ("hey tune", word-boundary); ignore everything else (music!).
+ *  1. Parked with the mic RELEASED until a press arms a window
+ *     (steering-wheel assistant button, notification action).
+ *  2. On press: open mic, record 16kHz mono until ~1.2s silence
+ *     (after speech starts), a 10s cap, or the window timeout.
+ *  3. Whistle transcribes; no wake phrase required inside a window.
  *  4. needle_complete(audio) -> tool calls; EXECUTE>=0.50, CONFIRM shows
  *     notification/TTS, REFUSE -> fallback regex parser.
  *  5. Dispatch via PlayerBridge (MediaController -> MusicService).
- *  6. Duck music (AudioFocus) while listening/confirming.
+ *  6. Duck music (AudioFocus) only while intentionally listening.
  *
  * Permissions: RECORD_AUDIO + FOREGROUND_SERVICE_MICROPHONE.
- * Battery: VAD keeps Whistle off; Whistle keeps Needle off; use
- * --audio-depth / small Needle subnetwork (8L) for the car.
  */
 class VoiceService : Service() {
 
@@ -37,6 +39,16 @@ class VoiceService : Service() {
         const val NOTIF_ID = 2001
         const val ACTION_START = "com.heytune.handsfree.START"
         const val ACTION_STOP = "com.heytune.handsfree.STOP"
+
+        /**
+         * One-shot listen (steering-wheel assistant button, notification
+         * action). Opens a wake-free window; the service stops itself
+         * afterwards unless driving mode is on.
+         */
+        const val ACTION_LISTEN_ONCE = "com.heytune.handsfree.LISTEN_ONCE"
+
+        /** How long a LISTEN_ONCE window stays open for the next utterance. */
+        const val LISTEN_ONCE_WINDOW_MS = 20_000L
 
         /** Host app injects its MediaController-backed bridge before start. */
         var playerBridge: PlayerBridge? = null
@@ -63,10 +75,31 @@ class VoiceService : Service() {
                 stopSelf()
                 return START_NOT_STICKY
             }
+            ACTION_LISTEN_ONCE -> {
+                settings = VoiceSettings.load(this)
+                if (!ModelManager.modelsReady(this)) {
+                    notify("Voice models not ready — enable driving mode once to download")
+                    stopSelf()
+                    return START_NOT_STICKY
+                }
+                armWindow()
+                if (!running) {
+                    if (!NeedleBridge.nativeAvailable) {
+                        notify("Voice engine unavailable on this device/ABI")
+                        stopSelf()
+                        return START_NOT_STICKY
+                    }
+                    startForeground(NOTIF_ID, notification("Listening… speak now 🎤"))
+                    startVoice()
+                } else {
+                    notify("Listening… speak now 🎤")
+                }
+                return START_STICKY
+            }
             else -> {
                 settings = VoiceSettings.load(this)
                 if (!settings.enabled || running) return START_STICKY
-                startForeground(NOTIF_ID, notification("Listening for 'hey tune'…"))
+                startForeground(NOTIF_ID, notification("Voice ready — press 🎤 or wheel button"))
                 startVoice()
                 return START_STICKY
             }
@@ -85,6 +118,8 @@ class VoiceService : Service() {
 
     private fun stopVoice() {
         running = false
+        listenArmed = false
+        synchronized(lock) { lock.notifyAll() }
         worker?.interrupt()
         worker = null
         abandonDuck()
@@ -96,8 +131,56 @@ class VoiceService : Service() {
     }
 
     // -- main loop ----------------------------------------------------------
+    //
+    // Button-triggered only: the thread parks with the mic RELEASED until a
+    // press arms a window, captures one utterance, then parks again (or the
+    // service stops when driving mode is off). No always-on listening.
+
+    private val lock = java.lang.Object()
+
+    @Volatile
+    private var listenArmed = false
+    private var armTime = 0L
+
+    /** Arms one button-triggered window; wakes the parked loop thread. */
+    private fun armWindow() {
+        synchronized(lock) {
+            listenArmed = true
+            armTime = SystemClock.elapsedRealtime()
+            lock.notifyAll()
+        }
+    }
 
     private fun loop() {
+        while (running && !Thread.interrupted()) {
+            // Park with the mic released until a button press arms a window.
+            try {
+                synchronized(lock) {
+                    while (running && !listenArmed) lock.wait()
+                }
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+                return
+            }
+            if (!running || Thread.interrupted()) return
+            listenArmed = false
+            captureOne()
+            // Button-only use: stop after the window unless driving mode
+            // keeps the service alive for the next press.
+            if (!settings.enabled) {
+                stopVoice()
+                stopSelf()
+                return
+            }
+        }
+    }
+
+    /**
+     * One bounded capture: mic opens on button press, closes on ~1.2s of
+     * silence (after speech starts), a 10s audio cap, or the window timeout.
+     * Gives up after ~5s of pure silence (pressed by accident / too slow).
+     */
+    private fun captureOne() {
         val sampleRate = WakeWordDetector.SAMPLE_RATE
         val minBuf = AudioRecord.getMinBufferSize(
             sampleRate,
@@ -122,58 +205,57 @@ class VoiceService : Service() {
 
         val frame = ShortArray(WakeWordDetector.FRAME_SAMPLES)
         val window = ArrayDeque<Short>()
-        var speechStreak = 0
         var silenceStreak = 0
-        var capturing = false
+        var speechSeen = false
 
         try {
+            duck() // duck as soon as we intentionally start listening
             while (running && !Thread.interrupted()) {
+                val elapsed = SystemClock.elapsedRealtime() - armTime
+                if (elapsed > LISTEN_ONCE_WINDOW_MS) break
+                if (!speechSeen && elapsed > 5_000) break // pressed, never spoke
+                if (window.size >= sampleRate * 10) break // 10s audio cap
                 val n = record.read(frame, 0, frame.size)
                 if (n <= 0) continue
                 val speech = WakeWordDetector.isSpeech(frame)
-
-                if (!capturing) {
-                    if (speech && ++speechStreak >= WakeWordDetector.speechFramesToOpen) {
-                        capturing = true
-                        silenceStreak = 0
-                        window.clear()
-                        duck()
-                    } else if (!speech) speechStreak = 0
-                    continue
-                }
-                // capturing: append, watch for end of utterance
                 for (i in 0 until n) {
-                    if (window.size >= sampleRate * 10) window.removeFirst() // 10s cap
+                    if (window.size >= sampleRate * 10) window.removeFirst()
                     window.addLast(frame[i])
                 }
-                if (speech) silenceStreak = 0 else silenceStreak++
-                if (silenceStreak >= WakeWordDetector.silenceFramesToClose || window.size >= sampleRate * 10) {
-                    capturing = false
-                    speechStreak = 0
-                    val pcm = window.toShortArray()
-                    window.clear()
-                    abandonDuck()
-                    if (pcm.size > sampleRate) handleUtterance(pcm) // >1s only
+                if (speech) {
+                    speechSeen = true
+                    silenceStreak = 0
+                } else {
+                    silenceStreak++
                 }
+                // End of utterance: ~1.2s of silence, but only after speech
+                // started (gives the driver a beat to speak after pressing).
+                if (speechSeen && silenceStreak >= WakeWordDetector.silenceFramesToClose) break
             }
         } finally {
             try { record.stop() } catch (_: Exception) {}
             record.release()
+            abandonDuck()
         }
+        val pcm = window.toShortArray()
+        // Short commands ("pause") run well under a second; only drop blips.
+        if (pcm.size > sampleRate / 3 && running) handleUtterance(pcm)
     }
 
     private fun handleUtterance(pcm: ShortArray) {
         val samples = WakeWordDetector.toFloatMono(pcm)
         val bridge = playerBridge ?: return
 
+        // Button-triggered window: no wake gate at all. stripWake is still
+        // applied so a habitual "hey tune ..." prefix never leaks into commands.
         // 1) Engine path: audio -> tool calls in one call.
         val result = try {
             NeedleBridge.completeAudio(samples, settings.language)
         } catch (_: Exception) { null }
 
-        if (result != null && VoiceTools.hasWake(result.audioText)) {
+        if (result != null) {
             val command = VoiceTools.stripWake(result.audioText)
-            if (command.isBlank()) return // bare "hey tune": attention, not a command
+            if (command.isBlank()) return // nothing said
             val (decision, calls) = VoiceTools.route(result)
             when (decision) {
                 VoiceDecision.EXECUTE -> {
@@ -196,11 +278,8 @@ class VoiceService : Service() {
             }
             return
         }
-        // 2) No engine / no wake in engine text: transcribe-only then gate.
-        // (Keeps music from triggering actions: require wake word.)
+        // 2) No engine result: transcribe-only then fallback parse.
         val text = result?.audioText ?: return
-        if (!VoiceTools.hasWake(text)) return // ignore cabin/music audio
-        if (VoiceTools.stripWake(text).isBlank()) return // bare "hey tune"
         fallback(text, bridge)
     }
 
@@ -255,13 +334,21 @@ class VoiceService : Service() {
         )
     }
 
-    private fun notification(text: String): Notification =
-        NotificationCompat.Builder(this, CHANNEL_ID)
+    private fun notification(text: String): Notification {
+        val listen = PendingIntent.getService(
+            this,
+            1,
+            Intent(this, VoiceService::class.java).setAction(ACTION_LISTEN_ONCE),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("HeyTune")
             .setContentText(text)
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .setOngoing(true)
+            .addAction(android.R.drawable.ic_btn_speak_now, "Listen", listen)
             .build()
+    }
 
     private fun notify(text: String) {
         val mgr = getSystemService(NotificationManager::class.java)
