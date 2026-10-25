@@ -6,6 +6,8 @@
 package com.heytune.app.ui.screens.settings.fragments
 
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -94,6 +96,12 @@ private fun AssistantRow() {
     val activity = context as? MainActivity ?: return
     if (!AssistantSetup.isRoleAvailable(activity)) return
     var isDefault by remember { mutableStateOf(AssistantSetup.isDefaultAssistant(activity)) }
+    val roleLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) {
+        // System role dialog returned (granted or not) — refresh from RoleManager.
+        isDefault = AssistantSetup.isDefaultAssistant(activity)
+    }
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
         Text(stringResource(R.string.voice_assistant_title))
         Text(
@@ -104,7 +112,7 @@ private fun AssistantRow() {
             Text(stringResource(R.string.voice_assistant_active))
         } else {
             Button(onClick = {
-                AssistantSetup.requestRole(activity) { granted -> isDefault = granted }
+                AssistantSetup.createRequestIntent(activity)?.let { roleLauncher.launch(it) }
             }) {
                 Text(stringResource(R.string.voice_assistant_action))
             }
