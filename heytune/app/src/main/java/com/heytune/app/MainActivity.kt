@@ -222,7 +222,7 @@ class MainActivity : ComponentActivity() {
         lifecycle.addObserver(controllerViewModel)
         controllerViewModel.addControllerCallback(lifecycle) { controller, _ ->
             playerConnection = PlayerConnection(controllerViewModel, database)
-            playerConnection?.let { VoiceIntegration.onControllerReady(this, controller, it) }
+            playerConnection?.let { VoiceIntegration.onControllerReady(this@MainActivity, controller, it) }
         }
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
