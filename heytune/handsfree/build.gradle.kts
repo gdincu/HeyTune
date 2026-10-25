@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "com.heytune.handsfree"
-    compileSdk = 36
+    compileSdk = 37
     // Must match the NDK installed in CI (see .github/workflows/android.yml).
     ndkVersion = "27.0.12077973"
 

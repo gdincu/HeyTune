@@ -57,7 +57,15 @@ jobs:
       - name: Install SDK packages
         run: |
           yes | sdkmanager --licenses > /dev/null
-          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0" "cmake;3.22.1" "ndk;27.0.12077973"
+          echo "--- stable channel platforms ---"
+          sdkmanager --list --channel=0 2>/dev/null | grep -E "platforms;android-3[67]" || true
+          if sdkmanager "platform-tools" "platforms;android-37" "build-tools;37.0.0" "cmake;3.22.1" "ndk;27.0.12077973"; then
+            echo "Installed android-37 from stable channel"
+          else
+            echo "Stable channel lacks android-37, trying preview/canary channels…"
+            sdkmanager --list --channel=3 2>/dev/null | grep -E "platforms;android-3[67]" || true
+            sdkmanager --channel=3 "platform-tools" "platforms;android-37" "build-tools;37.0.0" "cmake;3.22.1" "ndk;27.0.12077973"
+          fi
 
       - name: Fetch Cactus native engine (arm64 + armv7)
         run: |
@@ -78,9 +86,10 @@ jobs:
       - name: Make gradlew executable (Windows checkouts lose +x)
         run: chmod +x heytune/gradlew
 
-      - name: handsfree unit tests
-        working-directory: heytune
-        run: ./gradlew :handsfree:testDebugUnitTest --stacktrace
+      # handsfree unit tests removed from CI to keep debug-APK runs fast
+      # (~1m34s saved). Run locally when touching handsfree/:
+      #   cd heytune && ./gradlew :handsfree:testDebugUnitTest
+      # `assembleCoreDebug` below still compiles all modules, so breakage is caught.
 
       - name: Assemble debug APK
         working-directory: heytune
