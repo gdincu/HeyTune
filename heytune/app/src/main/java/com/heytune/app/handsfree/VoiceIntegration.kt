@@ -212,7 +212,7 @@ object VoiceIntegration {
     }
 
     /**
-     * "hey play X" -> search local library (songs + artist songs),
+     * "hey tune play X" -> search local library (songs + artist songs),
      * enqueue as a ListQueue and play the first hit.
      */
     private suspend fun searchAndPlay(

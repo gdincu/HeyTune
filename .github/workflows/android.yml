@@ -31,7 +31,7 @@ jobs:
         run: |
           diff tools.json heytune/app/src/main/assets/handsfree_tools.json
           python python/cli.py tools > /dev/null
-          python python/cli.py text "hey volume to 42" --fallback-only
+          python python/cli.py text "hey tune volume to 42" --fallback-only
 
   build-apk:
     name: Build debug APK (HeyTune)

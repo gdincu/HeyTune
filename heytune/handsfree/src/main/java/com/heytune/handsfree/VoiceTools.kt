@@ -23,11 +23,11 @@ object VoiceTools {
     const val EXECUTE_AT = 0.50
     const val CONFIRM_AT = 0.10 // engine floor: below -> suppressed_calls
 
-    // The wake word is bare "hey", word-boundary matched ("they", "whey"
-    // must NOT trigger). Anything after it is the command; "hey" alone
-    // is ignored before any Needle call.
-    private val WAKE_RE = Regex("""\bhey\b""", RegexOption.IGNORE_CASE)
-    private val WAKE_LEAD_RE = Regex("""^\s*hey\b[\s,.!:-]*""", RegexOption.IGNORE_CASE)
+    // The wake phrase is "hey tune" (two words, word-boundary matched:
+    // bare "hey", "they", "whey" etc. must NOT trigger). Anything after it
+    // is the command; "hey tune" alone is ignored before any Needle call.
+    private val WAKE_RE = Regex("""\bhey[\s,\-]+tunes?\b""", RegexOption.IGNORE_CASE)
+    private val WAKE_LEAD_RE = Regex("""^\s*hey[\s,\-]+tunes?\b[\s,.!:-]*""", RegexOption.IGNORE_CASE)
 
     fun hasWake(text: String): Boolean = WAKE_RE.containsMatchIn(text.trim())
 

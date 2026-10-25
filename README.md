@@ -1,6 +1,6 @@
 # HeyTune — hands-free music player (Whistle STT + Needle function calling)
 
-Say **"hey"** while driving to **play a song / pause / resume / next /
+Say **"hey tune"** while driving to **play a song / pause / resume / next /
 previous / volume / shuffle / like** — fully on-device, no network, using:
 
 - [Whistle](https://cactuscompute.com/blog/whistle) — 16.9 MB on-device speech-to-text (7 languages, 11 ms to first token)
@@ -59,13 +59,13 @@ as GitHub secrets (the app already supports `ot_release` signing config).
 pip install -r python\requirements.txt
 pip install pytest
 python -m pytest tests -q
-python python\cli.py text "hey volume to 42" --fallback-only
+python python\cli.py text "hey tune volume to 42" --fallback-only
 ```
 
 With models (downloaded once, then offline):
 
 ```bat
-python python\cli.py text "hey play Bohemian Rhapsody" --execute
+python python\cli.py text "hey tune play Bohemian Rhapsody" --execute
 python python\cli.py wav clip.wav --execute
 python python\cli.py mic
 ```
@@ -75,11 +75,11 @@ python python\cli.py mic
 1. Player → Settings → **Hands-free driving mode** on (mic permission →
    downloads `whistle.cact` + `needle3.cact` once, ~45 MB).
 2. `VoiceService` records 16 kHz mono; energy VAD opens a ≤10 s window;
-   Whistle transcribes; the wake word `hey` (word-boundary matched, so
-   "they"/"whey" don't trigger) is required — music/cabin audio without
-   it is ignored, and a bare "hey" with no command is dropped before any
-   Needle call. Note: `hey` is a common word (chat, lyrics), so expect
-   more activations than a two-word phrase; the guards above keep them
+   Whistle transcribes; the wake phrase `hey tune` (word-boundary matched,
+   so "they"/"whey" — and bare "hey" — don't trigger) is required — music/cabin
+   audio without it is ignored, and a bare "hey tune" with no command is dropped
+   before any Needle call. `hey tune` is far rarer in chat/lyrics than bare
+   `hey`, so expect few activations, and the guards above keep the rest
    cheap and silent.
 3. `needle_complete(audio)` → tool calls; `confidence ≥ 0.50` executes,
    otherwise a confirm notification/TTS, otherwise the offline regex fallback.

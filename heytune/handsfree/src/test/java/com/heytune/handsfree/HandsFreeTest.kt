@@ -10,25 +10,27 @@ import kotlin.test.assertTrue
 class HandsFreeTest {
 
     @Test fun wakeGate() {
-        assertTrue(VoiceTools.hasWake("hey play X"))
-        assertTrue(VoiceTools.hasWake("Hey, pause"))
+        assertTrue(VoiceTools.hasWake("hey tune play X"))
+        assertTrue(VoiceTools.hasWake("Hey Tune, pause"))
+        assertTrue(VoiceTools.hasWake("hey tunes next song")) // plural tolerated
         assertTrue(!VoiceTools.hasWake("play X"))
+        assertTrue(!VoiceTools.hasWake("hey play X")) // bare "hey" must NOT wake
         assertTrue(!VoiceTools.hasWake("they went home")) // word boundary
-        assertEquals("play X", VoiceTools.stripWake("hey play X"))
-        assertEquals("", VoiceTools.stripWake("hey"))
+        assertEquals("play X", VoiceTools.stripWake("hey tune play X"))
+        assertEquals("", VoiceTools.stripWake("hey tune"))
     }
 
     @Test fun fallbackCommands() {
-        assertEquals("play_song", CommandParser.parse("hey play Bohemian Rhapsody")?.name)
-        assertEquals("pause_playback", CommandParser.parse("hey pause")?.name)
-        assertEquals("resume_playback", CommandParser.parse("hey resume")?.name)
-        assertEquals("next_track", CommandParser.parse("hey next song")?.name)
-        assertEquals("previous_track", CommandParser.parse("hey go back")?.name)
-        assertEquals(mapOf("level" to 50), CommandParser.parse("hey volume to 50")?.arguments)
-        assertEquals(mapOf("on" to true), CommandParser.parse("hey shuffle on")?.arguments)
-        assertEquals(mapOf("on" to false), CommandParser.parse("hey stop shuffling")?.arguments)
-        assertNull(CommandParser.parse("hey hello world"))
-        assertNull(CommandParser.parse("hey"))
+        assertEquals("play_song", CommandParser.parse("hey tune play Bohemian Rhapsody")?.name)
+        assertEquals("pause_playback", CommandParser.parse("hey tune pause")?.name)
+        assertEquals("resume_playback", CommandParser.parse("hey tune resume")?.name)
+        assertEquals("next_track", CommandParser.parse("hey tune next song")?.name)
+        assertEquals("previous_track", CommandParser.parse("hey tune go back")?.name)
+        assertEquals(mapOf("level" to 50), CommandParser.parse("hey tune volume to 50")?.arguments)
+        assertEquals(mapOf("on" to true), CommandParser.parse("hey tune shuffle on")?.arguments)
+        assertEquals(mapOf("on" to false), CommandParser.parse("hey tune stop shuffling")?.arguments)
+        assertNull(CommandParser.parse("hey tune hello world"))
+        assertNull(CommandParser.parse("hey tune"))
     }
 
     @Test fun routing() {

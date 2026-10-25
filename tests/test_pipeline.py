@@ -14,34 +14,35 @@ from pipeline import (  # noqa: E402
 
 
 def test_wake_gate():
-    assert has_wake("hey play Bohemian Rhapsody")
-    assert has_wake("Hey, pause the music")
-    assert has_wake("so hey, next song")
+    assert has_wake("hey tune play Bohemian Rhapsody")
+    assert has_wake("Hey Tune, pause the music")
+    assert has_wake("so hey tune, next song")
     assert not has_wake("play Bohemian Rhapsody")
+    assert not has_wake("hey play Bohemian Rhapsody")  # bare "hey" must NOT wake
     # Word boundary: "they", "whey", "ahey" must NOT trigger.
     assert not has_wake("they went home")
     assert not has_wake("whey protein")
 
 
 def test_strip_wake():
-    assert strip_wake("hey play X") == "play X"
-    assert strip_wake("Hey, pause") == "pause"
-    assert strip_wake("hey") == ""
+    assert strip_wake("hey tune play X") == "play X"
+    assert strip_wake("Hey Tune, pause") == "pause"
+    assert strip_wake("hey tune") == ""
     assert strip_wake("play X") == "play X"
 
 
 def test_fallback_commands():
-    assert parse_fallback("hey play Bohemian Rhapsody").name == "play_song"
-    assert parse_fallback("hey play X").arguments["query"] == "X"
-    assert parse_fallback("hey pause").name == "pause_playback"
-    assert parse_fallback("hey resume").name == "resume_playback"
-    assert parse_fallback("hey next song").name == "next_track"
-    assert parse_fallback("hey previous").name == "previous_track"
-    assert parse_fallback("hey volume to 50").arguments == {"level": 50}
-    assert parse_fallback("hey shuffle on").arguments == {"on": True}
-    assert parse_fallback("hey like this song").name == "like_current_song"
-    assert parse_fallback("hey hello world") is None
-    assert parse_fallback("hey") is None
+    assert parse_fallback("hey tune play Bohemian Rhapsody").name == "play_song"
+    assert parse_fallback("hey tune play X").arguments["query"] == "X"
+    assert parse_fallback("hey tune pause").name == "pause_playback"
+    assert parse_fallback("hey tune resume").name == "resume_playback"
+    assert parse_fallback("hey tune next song").name == "next_track"
+    assert parse_fallback("hey tune previous").name == "previous_track"
+    assert parse_fallback("hey tune volume to 50").arguments == {"level": 50}
+    assert parse_fallback("hey tune shuffle on").arguments == {"on": True}
+    assert parse_fallback("hey tune like this song").name == "like_current_song"
+    assert parse_fallback("hey tune hello world") is None
+    assert parse_fallback("hey tune") is None
 
 
 def test_routing_thresholds():
@@ -133,9 +134,9 @@ def test_pipeline_execute_and_dispatch():
                        "reasoning": "pause"})
     out = transcribe_then_complete(
         "clip.wav", agent=agent,
-        transcribe_fn=fake_transcribe("hey pause the music"))
+        transcribe_fn=fake_transcribe("hey tune pause the music"))
     assert out["decision"] == "execute"
-    assert out["audio_text"] == "hey pause the music"
+    assert out["audio_text"] == "hey tune pause the music"
     player = FakePlayer()
     res = dispatch(out["function_calls"], player)
     assert player.calls == [("pause",)] and res == [{"paused": True}]
@@ -149,7 +150,7 @@ def test_pipeline_agreement_upgrade():
                        "reasoning": "pause"})
     out = transcribe_then_complete(
         "clip.wav", agent=agent,
-        transcribe_fn=fake_transcribe("hey pause the music"))
+        transcribe_fn=fake_transcribe("hey tune pause the music"))
     assert out["decision"] == "execute" and out.get("agreed_with_fallback") is True
 
 
@@ -160,7 +161,7 @@ def test_pipeline_confirm_when_model_and_fallback_disagree():
                        "reasoning": "like"})
     out = transcribe_then_complete(
         "clip.wav", agent=agent,
-        transcribe_fn=fake_transcribe("hey pause the music"))
+        transcribe_fn=fake_transcribe("hey tune pause the music"))
     assert out["decision"] == "confirm"
 
 
@@ -169,12 +170,12 @@ def test_pipeline_fallback_when_model_refuses():
                        "confidence": 0.0, "reasoning": ""})
     out = transcribe_then_complete(
         "clip.wav", agent=agent,
-        transcribe_fn=fake_transcribe("hey volume to 42"))
+        transcribe_fn=fake_transcribe("hey tune volume to 42"))
     assert out["decision"] == "fallback"
     assert out["function_calls"] == [{"name": "set_volume", "arguments": {"level": 42}}]
 
 
-def test_pipeline_bare_hey_ignored_without_needle_call():
+def test_pipeline_bare_wake_ignored_without_needle_call():
     calls = []
 
     class CountingAgent(FakeAgent):
@@ -184,6 +185,6 @@ def test_pipeline_bare_hey_ignored_without_needle_call():
 
     out = transcribe_then_complete(
         "clip.wav", agent=CountingAgent({"function_calls": [], "confidence": 0}),
-        transcribe_fn=fake_transcribe("hey"))
+        transcribe_fn=fake_transcribe("hey tune"))
     assert out["decision"] == "ignored" and out["reason"] == "wake-only"
     assert calls == []

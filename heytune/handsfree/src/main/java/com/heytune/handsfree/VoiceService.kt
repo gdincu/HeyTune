@@ -20,7 +20,7 @@ import androidx.core.app.NotificationCompat
  * Loop (all on-device, no network):
  *  1. AudioRecord 16kHz mono, 80ms frames; VAD gates Whistle.
  *  2. On speech: buffer until ~1.2s silence, transcribe via NeedleBridge.
- *  3. Require wake word ("hey", word-boundary); ignore everything else (music!).
+ *  3. Require wake phrase ("hey tune", word-boundary); ignore everything else (music!).
  *  4. needle_complete(audio) -> tool calls; EXECUTE>=0.50, CONFIRM shows
  *     notification/TTS, REFUSE -> fallback regex parser.
  *  5. Dispatch via PlayerBridge (MediaController -> MusicService).
@@ -66,7 +66,7 @@ class VoiceService : Service() {
             else -> {
                 settings = VoiceSettings.load(this)
                 if (!settings.enabled || running) return START_STICKY
-                startForeground(NOTIF_ID, notification("Listening for 'hey'…"))
+                startForeground(NOTIF_ID, notification("Listening for 'hey tune'…"))
                 startVoice()
                 return START_STICKY
             }
@@ -173,7 +173,7 @@ class VoiceService : Service() {
 
         if (result != null && VoiceTools.hasWake(result.audioText)) {
             val command = VoiceTools.stripWake(result.audioText)
-            if (command.isBlank()) return // bare "hey": attention, not a command
+            if (command.isBlank()) return // bare "hey tune": attention, not a command
             val (decision, calls) = VoiceTools.route(result)
             when (decision) {
                 VoiceDecision.EXECUTE -> {
@@ -200,7 +200,7 @@ class VoiceService : Service() {
         // (Keeps music from triggering actions: require wake word.)
         val text = result?.audioText ?: return
         if (!VoiceTools.hasWake(text)) return // ignore cabin/music audio
-        if (VoiceTools.stripWake(text).isBlank()) return // bare "hey"
+        if (VoiceTools.stripWake(text).isBlank()) return // bare "hey tune"
         fallback(text, bridge)
     }
 

@@ -17,11 +17,12 @@ import re
 from dataclasses import dataclass
 from typing import Any, Callable
 
-# The wake word is bare "hey" (word-boundary matched: "they", "whey" etc.
-# must NOT trigger). Anything after it is the command; "hey" alone is ignored.
-WAKE_WORD = "hey"
-_WAKE_RE = re.compile(r"\bhey\b", re.IGNORECASE)
-_WAKE_LEAD_RE = re.compile(r"^\s*hey\b[\s,.!:-]*", re.IGNORECASE)
+# The wake phrase is "hey tune" (two words, word-boundary matched: bare
+# "hey", "they", "whey" etc. must NOT trigger). Anything after it is the
+# command; "hey tune" alone is ignored.
+WAKE_WORD = "hey tune"
+_WAKE_RE = re.compile(r"\bhey[\s,\-]+tunes?\b", re.IGNORECASE)
+_WAKE_LEAD_RE = re.compile(r"^\s*hey[\s,\-]+tunes?\b[\s,.!:-]*", re.IGNORECASE)
 
 # Confidence routing thresholds (Cactus guide: act / confirm / refuse).
 # Calibrated 2026-10-25 on Needle 3 base (no fine-tune):
@@ -91,7 +92,7 @@ def parse_fallback(text: str) -> ParsedCall | None:
             if name == "play_song" and not str(q.get("query", "")).strip():
                 continue
             return ParsedCall(name=name, arguments=q)
-    # Bare wake ("hey") or anything else unrecognised -> None (ignored).
+    # Bare wake ("hey tune") or anything else unrecognised -> None (ignored).
     return None
 
 
@@ -149,7 +150,7 @@ def transcribe_then_complete(
     command = strip_wake(text) if require_wake else text
 
     if require_wake and not command:
-        # Bare "hey" with nothing after it: attention, not a command.
+        # Bare "hey tune" with nothing after it: attention, not a command.
         # Ignore without spending a Needle call.
         return {"decision": "ignored", "reason": "wake-only",
                 "audio_text": text, "audio_language": lang,

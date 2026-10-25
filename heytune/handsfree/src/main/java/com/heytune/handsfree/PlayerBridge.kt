@@ -1,7 +1,10 @@
 package com.heytune.handsfree
 
+import android.os.Handler
+import android.os.Looper
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executor
 
 /**
@@ -16,7 +19,34 @@ import java.util.concurrent.Executor
  */
 class PlayerBridge(private val controller: MediaController) {
 
-    fun dispatch(calls: List<ToolCall>): List<Any?> = calls.map { dispatchOne(it) }
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    /**
+     * Media3 [MediaController] must be touched on the application thread
+     * (else `IllegalStateException: called from a wrong thread`). VoiceService
+     * calls this from its background mic thread, so marshal there and block
+     * briefly for the result; already-main callers run inline.
+     */
+    fun dispatch(calls: List<ToolCall>): List<Any?> {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            return calls.map(::dispatchOne)
+        }
+        var result: List<Any?> = emptyList()
+        var error: Throwable? = null
+        val done = CountDownLatch(1)
+        mainHandler.post {
+            try {
+                result = calls.map(::dispatchOne)
+            } catch (t: Throwable) {
+                error = t
+            } finally {
+                done.countDown()
+            }
+        }
+        done.await()
+        error?.let { throw it }
+        return result
+    }
 
     fun dispatchOne(call: ToolCall): Any? = when (call.name) {
         "pause_playback" -> controller.pause().also { lastAction = "pause" }
