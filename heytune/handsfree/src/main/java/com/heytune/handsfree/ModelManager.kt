@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 import kotlinx.coroutines.Dispatchers
@@ -30,8 +31,15 @@ object ModelManager {
     fun whistleFile(context: Context): File = File(dir(context), WHISTLE_FILE)
     fun needleFile(context: Context): File = File(dir(context), NEEDLE_FILE)
 
+    // Sanity bounds: a smaller file is a truncated download or an HTML
+    // error page, not a model. Treat it as missing so the next attempt
+    // re-downloads instead of failing the native load forever.
+    private const val MIN_WHISTLE_BYTES = 10L * 1024 * 1024
+    private const val MIN_NEEDLE_BYTES = 20L * 1024 * 1024
+
     fun modelsReady(context: Context): Boolean =
-        whistleFile(context).exists() && needleFile(context).exists()
+        whistleFile(context).length() >= MIN_WHISTLE_BYTES &&
+            needleFile(context).length() >= MIN_NEEDLE_BYTES
 
     /**
      * Load both models into the engine. Returns false when files are missing
@@ -57,21 +65,25 @@ object ModelManager {
         context: Context,
         onProgress: (fraction: Float, file: String) -> Unit = { _, _ -> },
     ): Unit = withContext(Dispatchers.IO) {
-        downloadOne(WHISTLE_URL, whistleFile(context), 0f, 0.4f, onProgress)
-        downloadOne(NEEDLE_URL, needleFile(context), 0.4f, 1f, onProgress)
+        downloadOne(WHISTLE_URL, whistleFile(context), MIN_WHISTLE_BYTES, 0f, 0.4f, onProgress)
+        downloadOne(NEEDLE_URL, needleFile(context), MIN_NEEDLE_BYTES, 0.4f, 1f, onProgress)
     }
 
     private fun downloadOne(
         url: String,
         dest: File,
+        minBytes: Long,
         rangeStart: Float,
         rangeEnd: Float,
         onProgress: (Float, String) -> Unit,
     ) {
-        if (dest.exists() && dest.length() > 0) {
+        if (dest.length() >= minBytes) {
             onProgress(rangeEnd, dest.name)
             return
         }
+        // Drop undersized leftovers (e.g. an HTML error page saved as .cact)
+        // so resume below starts clean instead of appending to garbage.
+        if (dest.exists()) dest.delete()
         val tmp = File(dest.parent, dest.name + ".part")
         var downloaded = if (tmp.exists()) tmp.length() else 0L
         val conn = URL(url).openConnection() as HttpURLConnection
@@ -80,6 +92,16 @@ object ModelManager {
             conn.connectTimeout = 15_000
             conn.readTimeout = 30_000
             conn.connect()
+            val code = conn.responseCode
+            if (code != HttpURLConnection.HTTP_OK && code != HttpURLConnection.HTTP_PARTIAL) {
+                throw IOException("HTTP $code downloading ${dest.name}")
+            }
+            if (downloaded > 0 && code == HttpURLConnection.HTTP_OK) {
+                // Server ignored our Range request: restart cleanly instead
+                // of appending a second full copy onto the partial file.
+                tmp.delete()
+                downloaded = 0L
+            }
             val total = conn.contentLengthLong.let { if (it > 0) it + downloaded else -1L }
             Log.i(TAG, "downloading ${dest.name} (${total / 1048576} MB)")
             conn.inputStream.use { input ->
@@ -99,6 +121,13 @@ object ModelManager {
             if (!tmp.renameTo(dest)) {
                 tmp.copyTo(dest, overwrite = true)
                 tmp.delete()
+            }
+            val finalSize = dest.length()
+            if (finalSize < minBytes) {
+                dest.delete()
+                throw IOException(
+                    "downloaded ${dest.name} is only $finalSize bytes, expected >= $minBytes"
+                )
             }
             onProgress(rangeEnd, dest.name)
         } finally {
