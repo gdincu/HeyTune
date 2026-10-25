@@ -38,9 +38,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: gradle/wrapper-validation-action@v2
-        with:
-          min-wrapper-count: 1
+      # No separate wrapper-validation step: gradle/actions/setup-gradle@v4
+      # already validates gradle-wrapper.jar checksums automatically.
+      # The old gradle/wrapper-validation-action@v2 is archived and flakes
+      # with `connect ETIMEDOUT 104.16.x.x:443` (see gradle/wrapper-validation-action#40).
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
