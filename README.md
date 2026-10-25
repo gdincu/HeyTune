@@ -92,6 +92,21 @@ silence gate drops steady noise. x86/x86_64 emulator builds assemble with a
 native stub (`nativeAvailable=false`, service refuses to start) since Cactus
 ships no x86 engine.
 
+## Steering-wheel / headset button (digital assistant)
+
+The car button never reaches apps directly — Android routes it to the
+selected *digital assistant*. HeyTune registers one
+(`HeyTuneAssistantService` + headless session): Player → Settings →
+voice section → **Set HeyTune as digital assistant**, then confirm in
+system Settings → Apps → Default apps if asked. A press opens one listen
+window (same as the notification 🎤 action) with no wake phrase; the
+service stops itself afterwards unless driving mode is on.
+
+Caveat: classic Android Auto **projection** reserves its button/mic for
+Gemini/Assistant and won't offer third-party assistants there. The
+assistant path works on the phone itself (Bluetooth, headset button)
+and on AAOS-native head units.
+
 ## Measured behaviour (Needle 3 base, no fine-tune, 2026-10-25)
 
 | command | call | confidence | decision |

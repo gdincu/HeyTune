@@ -159,6 +159,36 @@
             </intent-filter>
         </service>
 
+        <!-- Digital assistant: makes HeyTune selectable under system Settings
+             → Apps → Default apps → Digital assistant app. Only the default
+             assistant receives push-to-talk (steering-wheel button). -->
+        <service
+            android:name=".assistant.HeyTuneAssistantService"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_VOICE_INTERACTION"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.voice.VoiceInteractionService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.voice_interaction"
+                android:resource="@xml/assistant_interaction" />
+        </service>
+
+        <!-- Bound explicitly via assistant_interaction.xml; no intent-filter. -->
+        <service
+            android:name=".assistant.HeyTuneAssistantSessionService"
+            android:exported="true" />
+
+        <!-- Invisible trampoline: assistant press → one HeyTune listen window. -->
+        <activity
+            android:name=".assistant.AssistantListenActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:launchMode="singleInstance"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
         <meta-data
             android:name="com.google.android.gms.car.application"
             android:resource="@xml/automotive_app_desc" />

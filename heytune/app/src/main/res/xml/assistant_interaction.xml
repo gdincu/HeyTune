@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Advertises HeyTune as a voice interaction (assistant) app. The system
+     reads this to list HeyTune under Default apps → Digital assistant, and
+     routes push-to-talk (steering-wheel button) to HeyTuneAssistantService. -->
+<voice-interaction-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:sessionService="com.heytune.app.assistant.HeyTuneAssistantSessionService"
+    android:supportsAssist="true" />
