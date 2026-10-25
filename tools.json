@@ -1,0 +1,66 @@
+{
+  "tools": [
+    {
+      "name": "play_song",
+      "description": "Play a song, artist or album by name. Use for 'play X', 'put on X'.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string", "description": "Song/artist/album name, e.g. Bohemian Rhapsody" }
+        },
+        "required": ["query"]
+      },
+      "triggers": ["\\bplay\\b.*", "\\bput on\\b.*", "\\bstart\\b.*\\b(song|music|track)\\b.*"]
+    },
+    {
+      "name": "pause_playback",
+      "description": "Pause the current playback. Use for 'pause', 'pause the music'.",
+      "parameters": { "type": "object", "properties": {} },
+      "triggers": ["\\bpause\\b.*", "\\bstop\\b.*\\b(music|song|playback)\\b.*"]
+    },
+    {
+      "name": "resume_playback",
+      "description": "Resume paused playback. Use for 'resume', 'continue playing'.",
+      "parameters": { "type": "object", "properties": {} },
+      "triggers": ["\\bresume\\b.*", "\\bcontinue\\b.*", "\\bunpause\\b.*", "\\bplay\\b\\s*$"]
+    },
+    {
+      "name": "next_track",
+      "description": "Skip to the next track. Use for 'next', 'next song', 'skip'.",
+      "parameters": { "type": "object", "properties": {} },
+      "triggers": ["\\bnext\\b.*", "\\bskip\\b.*"]
+    },
+    {
+      "name": "previous_track",
+      "description": "Go back to the previous track. Use for 'previous', 'go back'.",
+      "parameters": { "type": "object", "properties": {} },
+      "triggers": ["\\bprevious\\b.*", "\\bback\\b.*", "\\blast song\\b.*"]
+    },
+    {
+      "name": "set_volume",
+      "description": "Set playback volume 0-100. Use for 'volume to 50', 'louder'.",
+      "parameters": {
+        "type": "object",
+        "properties": { "level": { "type": "integer", "minimum": 0, "maximum": 100 } },
+        "required": ["level"]
+      },
+      "triggers": ["\\bvolume\\b.*", "\\blouder\\b.*", "\\bquieter\\b.*"]
+    },
+    {
+      "name": "toggle_shuffle",
+      "description": "Set shuffle mode. on=true when the user says 'shuffle on' or 'enable shuffle'; on=false for 'shuffle off', 'disable shuffle' or 'stop shuffling'.",
+      "parameters": {
+        "type": "object",
+        "properties": { "on": { "type": "boolean" } },
+        "required": ["on"]
+      },
+      "triggers": ["\\bshuffl\\w*\\b.*"]
+    },
+    {
+      "name": "like_current_song",
+      "description": "Like / favourite the currently playing song.",
+      "parameters": { "type": "object", "properties": {} },
+      "triggers": ["\\blike\\b.*", "\\badd\\b.*\\b(favorite|favourite|playlist)\\b.*"]
+    }
+  ]
+}

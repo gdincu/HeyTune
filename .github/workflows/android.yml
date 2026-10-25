@@ -1,0 +1,77 @@
+name: android
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  python-checks:
+    name: Reference pipeline (no Android SDK needed)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install deps
+        run: |
+          pip install -r python/requirements.txt
+          pip install pytest
+      - name: Unit tests
+        run: python -m pytest tests -q
+      - name: tools.json is in sync with app assets
+        run: |
+          diff tools.json heytune/app/src/main/assets/handsfree_tools.json
+          python python/cli.py tools > /dev/null
+          python python/cli.py text "hey volume to 42" --fallback-only
+
+  build-apk:
+    name: Build debug APK (HeyTune)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: gradle/wrapper-validation-action@v2
+        with:
+          min-wrapper-count: 1
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@v4
+      - uses: android-actions/setup-android@v3
+
+      - name: Install SDK packages
+        run: |
+          yes | sdkmanager --licenses > /dev/null
+          sdkmanager "platform-tools" "platforms;android-37" "build-tools;36.0.0" "cmake;3.22.1" "ndk;27.0.12077973"
+
+      - name: Fetch Cactus native engine (arm64 + armv7)
+        run: |
+          pip install cactus-needle
+          for abi in android-arm64 android-armv7; do
+            rm -rf /tmp/eng && needle download "$abi" --out /tmp/eng
+            mkdir -p "heytune/handsfree/engine/$abi"
+            cp "$(find /tmp/eng -name libneedle.a | head -1)" "heytune/handsfree/engine/$abi/"
+            cp "$(find /tmp/eng -name needle.h | head -1)" "heytune/handsfree/engine/$abi/"
+          done
+          find heytune/handsfree/engine -type f
+
+      - name: Verify model URLs reachable
+        run: |
+          curl -fs -r 0-0 -o /dev/null https://huggingface.co/Cactus-Compute/whistle/resolve/main/whistle.cact
+          curl -fs -r 0-0 -o /dev/null https://huggingface.co/Cactus-Compute/needle3/resolve/main/needle3.cact
+
+      - name: handsfree unit tests
+        working-directory: heytune
+        run: ./gradlew :handsfree:testDebugUnitTest --stacktrace
+
+      - name: Assemble debug APK
+        working-directory: heytune
+        run: ./gradlew :app:assembleCoreDebug --stacktrace
+
+      - name: Upload APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: HeyTune-debug
+          path: heytune/app/build/outputs/apk/core/debug/*.apk

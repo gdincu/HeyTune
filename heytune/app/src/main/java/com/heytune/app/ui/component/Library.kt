@@ -1,0 +1,245 @@
+/*
+ * Copyright (C) 2024 z-huang/InnerTune
+ * Copyright (C) 2025 OuterTune Project
+ *
+ * SPDX-License-Identifier: GPL-3.0
+ *
+ * For any other attributions, refer to the git commit history
+ */
+
+package com.heytune.app.ui.component
+
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.navigation.NavController
+import com.heytune.app.db.entities.Album
+import com.heytune.app.db.entities.Artist
+import com.heytune.app.db.entities.Playlist
+import com.heytune.app.ui.component.items.AlbumGridItem
+import com.heytune.app.ui.component.items.AlbumListItem
+import com.heytune.app.ui.component.items.ArtistGridItem
+import com.heytune.app.ui.component.items.ArtistListItem
+import com.heytune.app.ui.component.items.PlaylistGridItem
+import com.heytune.app.ui.component.items.PlaylistListItem
+import com.heytune.app.ui.menu.AlbumMenu
+import com.heytune.app.ui.menu.ArtistMenu
+import com.heytune.app.ui.menu.MenuState
+import com.heytune.app.ui.menu.PlaylistMenu
+
+
+import kotlinx.coroutines.CoroutineScope
+
+@Composable
+fun LibraryArtistListItem(
+    navController: NavController,
+    menuState: MenuState,
+    coroutineScope: CoroutineScope,
+    artist: Artist,
+    modifier: Modifier = Modifier
+) = ArtistListItem(
+    artist = artist,
+    trailingContent = {
+        val haptic = LocalHapticFeedback.current
+        IconButton(
+            onClick = {
+                menuState.show {
+                    ArtistMenu(
+                        originalArtist = artist,
+                        coroutineScope = coroutineScope,
+                        onDismiss = menuState::dismiss
+                    )
+                }
+                haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+            }
+        ) {
+            Icon(
+                Icons.Rounded.MoreVert,
+                contentDescription = null
+            )
+        }
+    },
+    modifier = modifier
+        .fillMaxWidth()
+        .clickable {
+            navController.navigate("artist/${artist.id}")
+        }
+)
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun LibraryArtistGridItem(
+    navController: NavController,
+    menuState: MenuState,
+    coroutineScope: CoroutineScope,
+    artist: Artist,
+    modifier: Modifier = Modifier
+) = ArtistGridItem(
+    artist = artist,
+    fillMaxWidth = true,
+    modifier = modifier
+        .fillMaxWidth()
+        .combinedClickable(
+            onClick = {
+                navController.navigate("artist/${artist.id}")
+            },
+            onLongClick = {
+                menuState.show {
+                    ArtistMenu(
+                        originalArtist = artist,
+                        coroutineScope = coroutineScope,
+                        onDismiss = menuState::dismiss
+                    )
+                }
+            }
+        )
+)
+
+@Composable
+fun LibraryAlbumListItem(
+    modifier: Modifier = Modifier,
+    navController: NavController,
+    menuState: MenuState,
+    album: Album,
+    isActive: Boolean = false,
+    isPlaying: Boolean = false
+) = AlbumListItem(
+    album = album,
+    isActive = isActive,
+    isPlaying = isPlaying,
+    trailingContent = {
+        val haptic = LocalHapticFeedback.current
+        IconButton(
+            onClick = {
+                menuState.show {
+                    AlbumMenu(
+                        originalAlbum = album,
+                        navController = navController,
+                        onDismiss = menuState::dismiss
+                    )
+                }
+                haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+            }
+        ) {
+            Icon(
+                Icons.Rounded.MoreVert,
+                contentDescription = null
+            )
+        }
+    },
+    modifier = modifier
+        .fillMaxWidth()
+        .clickable {
+            navController.navigate("album/${album.id}")
+        }
+)
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun LibraryAlbumGridItem(
+    modifier: Modifier = Modifier,
+    navController: NavController,
+    menuState: MenuState,
+    coroutineScope: CoroutineScope,
+    album: Album,
+    isActive: Boolean = false,
+    isPlaying: Boolean = false
+) = AlbumGridItem(
+    album = album,
+    isActive = isActive,
+    isPlaying = isPlaying,
+    coroutineScope = coroutineScope,
+    fillMaxWidth = true,
+    modifier = modifier
+        .fillMaxWidth()
+        .combinedClickable(
+            onClick = {
+                navController.navigate("album/${album.id}")
+            },
+            onLongClick = {
+                menuState.show {
+                    AlbumMenu(
+                        originalAlbum = album,
+                        navController = navController,
+                        onDismiss = menuState::dismiss
+                    )
+                }
+            }
+        )
+)
+
+@Composable
+fun LibraryPlaylistListItem(
+    navController: NavController,
+    menuState: MenuState,
+    coroutineScope: CoroutineScope,
+    playlist: Playlist,
+    modifier: Modifier = Modifier
+) = PlaylistListItem(
+    playlist = playlist,
+    trailingContent = {
+        val haptic = LocalHapticFeedback.current
+        IconButton(
+            onClick = {
+                menuState.show {
+                    PlaylistMenu(
+                        navController = navController,
+                        playlist = playlist,
+                        coroutineScope = coroutineScope,
+                        onDismiss = menuState::dismiss
+                    )
+                }
+                haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+            }
+        ) {
+            Icon(
+                Icons.Rounded.MoreVert,
+                contentDescription = null
+            )
+        }
+    },
+    modifier = modifier
+        .fillMaxWidth()
+        .clickable {
+            navController.navigate("local_playlist/${playlist.id}")
+        }
+)
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun LibraryPlaylistGridItem(
+    navController: NavController,
+    menuState: MenuState,
+    coroutineScope: CoroutineScope,
+    playlist: Playlist,
+    modifier: Modifier = Modifier
+) = PlaylistGridItem(
+    playlist = playlist,
+    fillMaxWidth = true,
+    modifier = modifier
+        .fillMaxWidth()
+        .combinedClickable(
+            onClick = {
+                navController.navigate("local_playlist/${playlist.id}")
+            },
+            onLongClick = {
+                menuState.show {
+                    PlaylistMenu(
+                        navController = navController,
+                        playlist = playlist,
+                        coroutineScope = coroutineScope,
+                        onDismiss = menuState::dismiss
+                    )
+                }
+            }
+        )
+)
