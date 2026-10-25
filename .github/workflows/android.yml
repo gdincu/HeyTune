@@ -75,6 +75,9 @@ jobs:
           curl -fs -r 0-0 -o /dev/null https://huggingface.co/Cactus-Compute/whistle/resolve/main/whistle.cact
           curl -fs -r 0-0 -o /dev/null https://huggingface.co/Cactus-Compute/needle3/resolve/main/needle3.cact
 
+      - name: Make gradlew executable (Windows checkouts lose +x)
+        run: chmod +x heytune/gradlew
+
       - name: handsfree unit tests
         working-directory: heytune
         run: ./gradlew :handsfree:testDebugUnitTest --stacktrace
