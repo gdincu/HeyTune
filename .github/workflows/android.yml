@@ -54,15 +54,13 @@ jobs:
           fi
           ls "$P"
 
-      - name: Fetch Cactus native engine (arm64 + armv7)
+      - name: Fetch Cactus native engine (arm64 only)
         run: |
           pip install cactus-needle
-          for abi in android-arm64 android-armv7; do
-            rm -rf /tmp/eng && needle download "$abi" --out /tmp/eng
-            mkdir -p "heytune/handsfree/engine/$abi"
-            cp "$(find /tmp/eng -name libneedle.a | head -1)" "heytune/handsfree/engine/$abi/"
-            cp "$(find /tmp/eng -name needle.h | head -1)" "heytune/handsfree/engine/$abi/"
-          done
+          rm -rf /tmp/eng && needle download "android-arm64" --out /tmp/eng
+          mkdir -p "heytune/handsfree/engine/android-arm64"
+          cp "$(find /tmp/eng -name libneedle.a | head -1)" "heytune/handsfree/engine/android-arm64/"
+          cp "$(find /tmp/eng -name needle.h | head -1)" "heytune/handsfree/engine/android-arm64/"
           find heytune/handsfree/engine -type f
 
       - name: Verify model URLs reachable
@@ -75,9 +73,8 @@ jobs:
 
       - name: Verify staged native engine (must exist before CMake configure)
         run: |
-          ls -la heytune/handsfree/engine/android-arm64/ heytune/handsfree/engine/android-armv7/
+          ls -la heytune/handsfree/engine/android-arm64/
           test -f heytune/handsfree/engine/android-arm64/libneedle.a
-          test -f heytune/handsfree/engine/android-armv7/libneedle.a
 
       # handsfree unit tests removed from CI to keep debug-APK runs fast
       # (~1m34s saved). Run locally when touching handsfree/:

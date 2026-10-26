@@ -15,10 +15,10 @@ android {
         externalNativeBuild {
             cmake {
                 cppFlags += "-std=c++17"
-                // Prebuilt Cactus engine ships arm64 + armv7 (+riscv64) only.
-                // x86/x86_64 APKs build without the .so; NeedleBridge reports
+                // Prebuilt Cactus engine ships arm64 only (arm64-v8a).
+                // Other ABIs build without the .so; NeedleBridge reports
                 // nativeAvailable=false and VoiceService refuses to start there.
-                abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+                abiFilters += listOf("arm64-v8a")
             }
         }
         consumerProguardFiles("consumer-rules.pro")

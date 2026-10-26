@@ -7,7 +7,7 @@ on-device, no network needed.
 
 ## What you need
 
-- An Android phone (ARM — arm64 or armv7 — which is virtually every phone).
+- An Android phone with **arm64-v8a** (every modern phone since ~2017 — the build is arm64-only).
 - Your music files on the device (HeyTune plays your local library).
 - Microphone permission (only used in the short moment after you tap pause).
 - About 45 MB of free space once, for the offline voice models.
@@ -81,9 +81,9 @@ few seconds after you tap pause.
   with a working connection so the ~45 MB download can finish.
 - **"Microphone access is required"** — grant the permission in your
   phone's Settings → Apps → HeyTune → Permissions.
-- **"Voice engine unavailable on this device"** — you are likely on an
-  emulator or an x86 device, which the voice engine does not support.
-  Use a regular ARM Android phone.
+- **"Voice engine unavailable on this device"** — you are on an emulator,
+  an x86 device, or an older armv7 phone. The voice engine needs arm64 —
+  use a regular modern Android phone.
 - **It heard me but did nothing** — rephrase more simply (e.g. "next",
   "volume to 40"). Background noise and mumbling are the usual culprits;
   make sure the music actually paused first.
@@ -110,6 +110,6 @@ heytune/                        # App snapshot + integration
 ```
 
 Pushing to GitHub runs the `android` workflow: it stages the native
-engine for arm64/armv7, checks the model URLs, compiles everything, and
-uploads debug APKs as the `HeyTune-debug` artifact. No keystore is needed
+engine for arm64-v8a, checks the model URLs, compiles a single arm64 APK,
+and uploads it as the `HeyTune-debug` artifact. No keystore is needed
 for debug builds.
