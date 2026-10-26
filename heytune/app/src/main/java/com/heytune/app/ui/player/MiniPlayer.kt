@@ -80,6 +80,7 @@ fun MiniPlayer(
 ) {
     val playerConnection = LocalPlayerConnection.current ?: return
     val context = LocalContext.current
+    val voiceActivity = LocalContext.current as? com.heytune.app.MainActivity
     val queueBoard by playerConnection.queueBoard.collectAsState()
 
     val isPlaying by playerConnection.isPlaying.collectAsState()
@@ -152,7 +153,7 @@ fun MiniPlayer(
                         // Pause-to-talk: stop music first (no background
                         // noise), then open one English-only listen window.
                         playerConnection.player.pause()
-                        (context as? com.heytune.app.MainActivity)?.let {
+                        voiceActivity?.let {
                             com.heytune.app.handsfree.VoiceIntegration.onPausePressed(it)
                         }
                     } else {

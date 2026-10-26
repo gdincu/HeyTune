@@ -172,6 +172,7 @@ fun BottomSheetPlayer(
     Log.v(TAG, "PLR-1")
 
     val context = LocalContext.current
+    val voiceActivity = LocalContext.current as? com.heytune.app.MainActivity
     val currentView = LocalView.current
     val playerConnection = LocalPlayerConnection.current ?: return
     val queueBoard by playerConnection.service.queueBoard.collectAsState()
@@ -957,7 +958,7 @@ fun ControlsContent(
                                 // Pause-to-talk: stop music first (no background
                                 // noise), then open one English-only listen window.
                                 playerConnection.player.pause()
-                                (context as? com.heytune.app.MainActivity)?.let {
+                                voiceActivity?.let {
                                     com.heytune.app.handsfree.VoiceIntegration.onPausePressed(it)
                                 }
                             } else {

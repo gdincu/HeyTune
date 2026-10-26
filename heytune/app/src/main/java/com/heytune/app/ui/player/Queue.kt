@@ -239,6 +239,7 @@ fun BoxScope.QueueContent(
 ) {
     Log.v("QueueContent", "QC-1")
     val context = LocalContext.current
+    val voiceActivity = LocalContext.current as? com.heytune.app.MainActivity
     val coroutineScope = rememberCoroutineScope()
     val density = LocalDensity.current
     val haptic = LocalHapticFeedback.current
@@ -1068,7 +1069,7 @@ fun BoxScope.QueueContent(
                                     // Pause-to-talk: stop music first (no background
                                     // noise), then open one English-only listen window.
                                     playerConnection.player.pause()
-                                    (context as? com.heytune.app.MainActivity)?.let {
+                                    voiceActivity?.let {
                                         com.heytune.app.handsfree.VoiceIntegration.onPausePressed(it)
                                     }
                                 } else {
