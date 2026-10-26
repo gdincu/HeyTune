@@ -90,6 +90,12 @@ object VoiceIntegration {
                     true
                 }
             }
+            onRandomPlayRequest = {
+                activity.lifecycleScope.launch(Dispatchers.IO) {
+                    playRandom(activity, playerConnection)
+                }
+                true
+            }
             onLikeRequest = { playerConnection.toggleLike() }
         }
         VoiceService.playerBridge = bridge
@@ -305,6 +311,34 @@ object VoiceIntegration {
             Log.i(TAG, "voice play: '$query' -> ${songs.size} result(s) [songHits=${songHits.size} artistHits=${artistHits.size} randomArtist=$isArtistIntent], playing ${if (isArtistIntent) "random" else "first"}")
         } catch (e: Exception) {
             Log.w(TAG, "voice play failed for '$query'", e)
+        }
+    }
+
+    /** "play a random song" -> pick one random local song and play it */
+    private suspend fun playRandom(
+        activity: MainActivity,
+        playerConnection: PlayerConnection,
+    ) {
+        try {
+            val all = withContext(Dispatchers.IO) { playerConnection.database.allLocalSongs() }
+            if (all.isEmpty()) {
+                Log.i(TAG, "voice random: empty library")
+                return
+            }
+            val pick = all.random()
+            val items = listOf(pick.toMediaMetadata())
+            withContext(Dispatchers.Main) {
+                playerConnection.playQueue(
+                    ListQueue(
+                        title = "Random",
+                        items = items,
+                        startIndex = 0,
+                    ),
+                )
+            }
+            Log.i(TAG, "voice random -> ${pick.song.title} (${all.size} total)")
+        } catch (e: Exception) {
+            Log.w(TAG, "voice random failed", e)
         }
     }
 }

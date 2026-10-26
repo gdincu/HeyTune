@@ -65,6 +65,11 @@ object CommandParser {
         ) {
             return ToolCall("like_current_song")
         }
+        if (Regex("""\b(random|surprise me|shuffle play)\b""", RegexOption.IGNORE_CASE).containsMatchIn(t) ||
+            low.contains("play a random") || low.contains("play random") ||
+            low.contains("play something random") || low == "random" || low == "shuffle") {
+            return ToolCall("play_random_song")
+        }
         playQuery.find(t)?.let {
             val q = it.groups["query"]!!.value.trim().trimEnd('.', '!', '?')
             if (q.isNotEmpty()) return ToolCall("play_song", mapOf("query" to q))

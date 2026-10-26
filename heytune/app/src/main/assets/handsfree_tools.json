@@ -71,6 +71,12 @@
       "description": "Like / favourite the currently playing song.",
       "parameters": { "type": "object", "properties": {} },
       "triggers": ["\\blike\\b.*", "\\badd\\b.*\\b(favorite|favourite|playlist)\\b.*"]
+    },
+    {
+      "name": "play_random_song",
+      "description": "Play a random song from the local library. Use for 'play a random song', 'play something random', 'shuffle play', 'surprise me'.",
+      "parameters": { "type": "object", "properties": {} },
+      "triggers": ["\\brandom\\b.*", "\\bsurprise me\\b.*", "\\bshuffle play\\b.*"]
     }
   ]
 }

@@ -82,6 +82,11 @@ class PlayerBridge(private val controller: MediaController) {
             onLikeRequest?.invoke(controller.currentMediaItem?.mediaId)
             lastAction = "like"
         }
+        "play_random_song" -> {
+            val handled = onRandomPlayRequest?.invoke() ?: false
+            lastAction = if (handled) "random" else "random(unhandled)"
+            handled
+        }
         "play_song" -> {
             val query = call.arguments["query"] as? String ?: ""
             val handled = onPlaySearchRequest?.invoke(query) ?: false
@@ -100,6 +105,9 @@ class PlayerBridge(private val controller: MediaController) {
 
     /** Host hook: (query) -> true if enqueued+playing. Defaults to false. */
     var onPlaySearchRequest: ((String) -> Boolean)? = null
+
+    /** Host hook: () -> true if random play enqueued. */
+    var onRandomPlayRequest: (() -> Boolean)? = null
 
     /** Host hook: (mediaId?) -> Unit for like/favourite. */
     var onLikeRequest: ((String?) -> Unit)? = null
@@ -138,6 +146,7 @@ interface SimplePlayer {
 fun List<ToolCall>.dispatchOn(player: SimplePlayer): List<Any?> = map { call ->
     when (call.name) {
         "play_song" -> player.playSong(call.arguments["query"] as? String ?: "")
+        "play_random_song" -> player.playSong("__random__")
         "pause_playback" -> player.pause()
         "resume_playback" -> player.resume()
         "next_track" -> player.next()

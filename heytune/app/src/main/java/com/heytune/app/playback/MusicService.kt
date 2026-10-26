@@ -10,17 +10,22 @@
 package com.heytune.app.playback
 
 
+import android.Manifest
 import android.app.PendingIntent
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.database.SQLException
 import android.media.audiofx.AudioEffect
 import android.net.ConnectivityManager
 import android.os.Binder
+import android.os.Build
 import android.util.Log
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
+import com.heytune.handsfree.VoiceService
 import androidx.core.net.toUri
 import androidx.datastore.preferences.core.edit
 import androidx.media3.common.AudioAttributes
@@ -790,6 +795,28 @@ class MusicService : MediaLibraryService(),
             val pos = player.currentPosition
             val q = queueBoard.value.getCurrentQueue()
             q?.lastSongPos = pos
+            // Remote pause (notification / Android Auto / headset) -> arm STT
+            // Mirrors in-app pause-to-talk. Skip if voice just issued pause_playback.
+            if (player.playbackState != Player.STATE_ENDED) {
+                val last = VoiceService.playerBridge?.lastAction
+                if (last != "pause" && !VoiceService.isListening.value) {
+                    if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                        try {
+                            val intent = Intent(this, VoiceService::class.java).setAction(VoiceService.ACTION_LISTEN_ONCE)
+                            if (Build.VERSION.SDK_INT >= 26) startForegroundService(intent) else startService(intent)
+                        } catch (_: Exception) {
+                            Log.w(TAG, "remote pause voice arm failed")
+                        }
+                    }
+                }
+            }
+        } else {
+            // Resumed (play button / Auto play) while mic is open -> cancel window, like in-app play tap
+            if (VoiceService.isListening.value) {
+                try {
+                    startService(Intent(this, VoiceService::class.java).setAction(VoiceService.ACTION_CANCEL_WINDOW))
+                } catch (_: Exception) {}
+            }
         }
         super.onIsPlayingChanged(isPlaying)
     }
