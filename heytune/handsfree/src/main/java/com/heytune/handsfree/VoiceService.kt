@@ -96,9 +96,17 @@ class VoiceService : Service() {
             }
             ACTION_LISTEN_ONCE -> {
                 settings = VoiceSettings.load(this)
+                // Promote to foreground immediately when started via
+                // startForegroundService (e.g. MusicService remote pause).
+                // Otherwise an early return (model not ready / no native)
+                // would trigger ForegroundServiceDidNotStartInTimeException.
+                val needsFg = !running
+                if (needsFg) {
+                    startForeground(NOTIF_ID, notification("Listening… speak now 🎤"))
+                }
                 if (!ModelManager.modelsReady(this)) {
                     notify("Voice models not ready — enable driving mode once to download")
-                    stopSelf()
+                    if (needsFg) stopSelf()
                     return START_NOT_STICKY
                 }
                 armWindow()
@@ -108,7 +116,7 @@ class VoiceService : Service() {
                         stopSelf()
                         return START_NOT_STICKY
                     }
-                    startForeground(NOTIF_ID, notification("Listening… speak now 🎤"))
+                    // Already foregrounded above; just start the worker
                     startVoice()
                 } else {
                     notify("Listening… speak now 🎤")

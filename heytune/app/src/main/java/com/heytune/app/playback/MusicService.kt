@@ -803,7 +803,10 @@ class MusicService : MediaLibraryService(),
                     if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
                         try {
                             val intent = Intent(this, VoiceService::class.java).setAction(VoiceService.ACTION_LISTEN_ONCE)
-                            if (Build.VERSION.SDK_INT >= 26) startForegroundService(intent) else startService(intent)
+                            // Use startService and let VoiceService promote itself.
+                            // startForegroundService here triggers FGS timeout if VoiceService
+                            // does early stopSelf (model not ready) without startForeground.
+                            startService(intent)
                         } catch (_: Exception) {
                             Log.w(TAG, "remote pause voice arm failed")
                         }
