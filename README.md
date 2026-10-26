@@ -1,9 +1,8 @@
 # HeyTune — pause-to-talk music player
 
-HeyTune plays the music stored on your phone and lets you control it with
-your voice. There is no wake word and nothing is always listening: you tap
-**pause**, say what you want in English, and the app does it — fully
-on-device, no network needed.
+HeyTune is a fork of [OuterTune](https://github.com/OuterTune/OuterTune) (`lite`, local-playback only) that adds [Whistle](https://huggingface.co/Cactus-Compute/whistle) (speech-to-text) and [Needle 3](https://huggingface.co/Cactus-Compute/needle3) from [Cactus Compute](https://www.cactuscompute.com) to control the media player with your voice.
+
+It plays the music stored on your phone — no wake word and nothing is always listening: you tap **pause** (in-app, notification, headset or Android Auto), say what you want in English, and the app does it — fully on-device, no network needed. After every command the music resumes automatically (except when you say “pause”).
 
 ## What you need
 
@@ -53,20 +52,20 @@ never a microphone listening in the background.
 
 ## What you can say
 
-Speak naturally in English. For example:
+Speak naturally in English. All commands are defined in `heytune/app/src/main/assets/handsfree_tools.json` and run via Needle 3 on-device:
 
-- "play Bohemian Rhapsody" — find a song, artist, or album in your
-  library and play it
-- "resume" / "continue playing" — keep playing after a pause
-- "next" / "skip" — jump to the next track
-- "go back" / "previous" — go back a track
-- "volume to 50" / "louder" / "quieter" — set the volume (0–100)
-- "shuffle on" / "shuffle off" / "stop shuffling" — control shuffle
-- "repeat off" / "repeat all" / "repeat one" (or "repeat this song") —
-  control repeat
-- "like this song" — favourite the current song
+- **"play Bohemian Rhapsody" / "put on Bohemian Rhapsody" / "start song Bohemian Rhapsody"** — find a song, artist or album in your library and play it (`play_song` with `query`). Saying an artist name (e.g. “play Tom Walker”) plays a random song from that artist.
+- **"play a random song" / "play something random" / "surprise me" / "shuffle play" / "random"** — play a random song from your library (`play_random_song`)
+- **"pause" / "stop the music" / "stop"** — pause playback (`pause_playback`)
+- **"resume" / "continue playing" / "unpause" / "play"** — resume playback (`resume_playback`)
+- **"next" / "next song" / "next track" / "skip" / "skip this"** — jump to the next track (`next_track`)
+- **"previous" / "previous song" / "go back" / "last song"** — go back a track (`previous_track`)
+- **"volume to 50" / "volume at 30" / "louder" (≈70) / "quieter" (≈30)** — set volume 0–100 (`set_volume` with `level`)
+- **"shuffle on" / "shuffle off" / "stop shuffling" / "disable shuffle"** — control shuffle (`toggle_shuffle` with `on`)
+- **"repeat off" / "don't repeat" / "repeat all" / "loop all" / "repeat one" / "repeat this song" / "loop this"** — control repeat (`set_repeat_mode` with `mode: off/all/one`)
+- **"like this song" / "like the song" / "add to favorite/favourite"** — favourite the current song (`like_current_song`)
 
-Anything else is ignored with a short message saying what was heard.
+Anything else is ignored with a short message saying what was heard (“Heard ‘…’ — no matching command”).
 
 ## Your privacy
 
@@ -90,11 +89,7 @@ few seconds after you tap pause.
 
 ## For developers
 
-HeyTune is built from an OuterTune (`lite`, local-playback only) snapshot
-with voice integration added; the same approach applies to active forks
-(`Metrolist`, `InterTune`, …). Upstream files under `heytune/` keep their
-original copyright headers and docs. App identity: `com.heytune.app`
-(`Theme.HeyTune`, launcher name **HeyTune**).
+HeyTune is a fork of [OuterTune](https://github.com/OuterTune/OuterTune) (`lite`, local-playback only) with voice integration added — the same approach applies to active forks (`Metrolist`, `InterTune`, …). It adds Whistle and Needle 3 from Cactus Compute (see `heytune/handsfree/`). Upstream files under `heytune/` keep their original copyright headers and docs. App identity: `com.heytune.app` (`Theme.HeyTune`, launcher name **HeyTune**).
 
 ```
 heytune/                        # App snapshot + integration
