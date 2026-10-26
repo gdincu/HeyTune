@@ -42,7 +42,8 @@ No Play Store, no account, no sign-in.
    phone's own green mic dot at the top of the screen (shown by Android
    whenever any app uses the mic) and a small green mic badge on the
    pause button inside the app. When they disappear, the moment has
-   passed — just tap pause again.
+   passed — just tap pause again. Changed your mind mid-listen? Just
+   tap play: the microphone closes immediately and nothing is executed.
 3. The app carries it out. If it wasn't sure what you said, it tells you
    what it heard instead of guessing.
 

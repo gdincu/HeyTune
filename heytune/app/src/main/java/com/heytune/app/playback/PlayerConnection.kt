@@ -141,6 +141,13 @@ class PlayerConnection(
 
     fun toggleLike() {
         service.toggleLike()
+        // The service flips the row in the DB (the notification heart
+        // follows via Room), but mediaMetadata is a snapshot taken on track
+        // change — flip it here too so the in-app heart updates instantly.
+        // Both the UI button and voice like go through this method.
+        mediaMetadata.value?.let { current ->
+            mediaMetadata.value = current.copy(liked = !current.liked)
+        }
     }
 
     fun toggleLibrary() {

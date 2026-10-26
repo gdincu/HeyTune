@@ -53,6 +53,14 @@ class VoiceService : Service() {
         /** How long a LISTEN_ONCE window stays open for the next utterance. */
         const val LISTEN_ONCE_WINDOW_MS = 20_000L
 
+        /**
+         * Cancels the current listen window: the mic closes, any captured
+         * audio is dropped without inference, and no command executes.
+         * The service itself keeps running (unless driving mode is off).
+         * Sent when the user taps play while listening.
+         */
+        const val ACTION_CANCEL_WINDOW = "com.heytune.handsfree.CANCEL_WINDOW"
+
         /** Host app injects its MediaController-backed bridge before start. */
         var playerBridge: PlayerBridge? = null
 
@@ -107,6 +115,11 @@ class VoiceService : Service() {
                 }
                 return START_STICKY
             }
+            ACTION_CANCEL_WINDOW -> {
+                cancelWindow()
+                if (!running) stopSelf()
+                return START_STICKY
+            }
             else -> {
                 settings = VoiceSettings.load(this)
                 if (!settings.enabled || running) return START_STICKY
@@ -155,13 +168,33 @@ class VoiceService : Service() {
     private var listenArmed = false
     private var armTime = 0L
 
+    /**
+     * Set when the user taps play mid-window: the in-flight capture
+     * aborts, its audio is dropped without inference, and nothing executes.
+     */
+    @Volatile
+    private var cancelRequested = false
+
     /** Arms one pause-triggered window; wakes the parked loop thread. */
     private fun armWindow() {
         synchronized(lock) {
             listenArmed = true
+            cancelRequested = false
             armTime = SystemClock.elapsedRealtime()
             lock.notifyAll()
         }
+    }
+
+    /**
+     * Cancels the current window (user tapped play): disarm so no new
+     * capture starts, and interrupt the in-flight capture so the mic
+     * closes promptly. The service itself keeps running.
+     */
+    private fun cancelWindow() {
+        cancelRequested = true
+        listenArmed = false
+        synchronized(lock) { lock.notifyAll() }
+        worker?.interrupt()
     }
 
     private fun loop() {
@@ -224,7 +257,7 @@ class VoiceService : Service() {
 
         try {
             duck() // duck as soon as we intentionally start listening
-            while (running && !Thread.interrupted()) {
+            while (running && !Thread.interrupted() && !cancelRequested) {
                 val elapsed = SystemClock.elapsedRealtime() - armTime
                 if (elapsed > LISTEN_ONCE_WINDOW_MS) break
                 if (!speechSeen && elapsed > 5_000) break // pressed, never spoke
@@ -251,6 +284,14 @@ class VoiceService : Service() {
             try { record.stop() } catch (_: Exception) {}
             record.release()
             abandonDuck()
+        }
+        // A cancelled window (user tapped play) is dropped altogether:
+        // no inference, no dispatch. Never act on stale audio.
+        val cancelled = cancelRequested
+        cancelRequested = false
+        if (cancelled) {
+            window.clear()
+            return
         }
         val pcm = window.toShortArray()
         // Short commands ("pause") run well under a second; only drop blips.

@@ -27,6 +27,19 @@ object NeedleBridge {
     var nativeAvailable: Boolean = false
         private set
 
+    /**
+     * Serializes ALL native engine access. The engine keeps global state
+     * (needle_set_audio mutates it per call), so overlapping calls from
+     * different threads — e.g. a model reload on Dispatchers.IO while an
+     * inference runs on the voice worker thread — corrupt it and crash
+     * native code (SIGSEGV in project_batch_neon). Every entry point
+     * below goes through this lock.
+     */
+    private val engineLock = Any()
+
+    /** Hash of the tools JSON the engine was last initialised with. */
+    private var loadedToolsHash: Int? = null
+
     /** Load whistle.cact + needle3.cact and register toolsJson. */
     external fun nativeLoad(whistlePath: String, needlePath: String, toolsJson: String): Boolean
 
@@ -38,8 +51,17 @@ object NeedleBridge {
 
     fun load(whistlePath: String, needlePath: String, toolsJson: String): Boolean {
         return try {
-            nativeAvailable = nativeLoad(whistlePath, needlePath, toolsJson)
-            nativeAvailable
+            synchronized(engineLock) {
+                // Skip redundant reloads: re-initialising the engine on every
+                // pause tap churns native state for no benefit. A changed
+                // tools JSON (e.g. after an app update) still reloads.
+                if (nativeAvailable && loadedToolsHash == toolsJson.hashCode()) {
+                    return true
+                }
+                nativeAvailable = nativeLoad(whistlePath, needlePath, toolsJson)
+                if (nativeAvailable) loadedToolsHash = toolsJson.hashCode()
+                nativeAvailable
+            }
         } catch (_: UnsatisfiedLinkError) {
             false
         }
@@ -47,7 +69,9 @@ object NeedleBridge {
 
     fun completeAudio(samples: FloatArray, language: String? = VoiceTools.VOICE_LANGUAGE): VoiceResult? {
         val bytes = try {
-            nativeCompleteAudio(samples, language ?: VoiceTools.VOICE_LANGUAGE)
+            synchronized(engineLock) {
+                nativeCompleteAudio(samples, language ?: VoiceTools.VOICE_LANGUAGE)
+            }
         } catch (_: UnsatisfiedLinkError) {
             return null
         } ?: return null
@@ -56,7 +80,9 @@ object NeedleBridge {
 
     fun transcribe(samples: FloatArray, language: String? = VoiceTools.VOICE_LANGUAGE): VoiceResult? {
         val bytes = try {
-            nativeTranscribe(samples, language ?: VoiceTools.VOICE_LANGUAGE)
+            synchronized(engineLock) {
+                nativeTranscribe(samples, language ?: VoiceTools.VOICE_LANGUAGE)
+            }
         } catch (_: UnsatisfiedLinkError) {
             return null
         } ?: return null

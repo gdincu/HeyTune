@@ -162,6 +162,13 @@ fun MiniPlayer(
                             }
                         } else {
                             playerConnection.player.play()
+                            // Tapping play while listening cancels the STT
+                            // window altogether: mic closes, nothing executes.
+                            if (listening) {
+                                voiceActivity?.let {
+                                    com.heytune.app.handsfree.VoiceIntegration.cancelListen(it)
+                                }
+                            }
                         }
                     }
                 ) {

@@ -1077,9 +1077,16 @@ fun BoxScope.QueueContent(
                                         voiceActivity?.let {
                                             com.heytune.app.handsfree.VoiceIntegration.onPausePressed(it)
                                         }
-                                    } else {
-                                        playerConnection.player.play()
-                                    }
+                                        } else {
+                                            playerConnection.player.play()
+                                            // Tapping play while listening cancels the STT
+                                            // window altogether: mic closes, nothing executes.
+                                            if (listening) {
+                                                voiceActivity?.let {
+                                                    com.heytune.app.handsfree.VoiceIntegration.cancelListen(it)
+                                                }
+                                            }
+                                        }
                                     // play/pause is slightly harder haptic
                                     haptic.performHapticFeedback(HapticFeedbackType.Confirm)
                                 }

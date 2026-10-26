@@ -144,6 +144,18 @@ object VoiceIntegration {
     fun onPausePressed(activity: MainActivity) = listenOnce(activity)
 
     /**
+     * Play was tapped while a listen window may be open: close the mic and
+     * drop the window altogether (no inference, no command executes).
+     * Safe to call when nothing is listening — it is a no-op then.
+     */
+    fun cancelListen(activity: MainActivity) {
+        activity.startService(
+            Intent(activity, VoiceService::class.java)
+                .setAction(VoiceService.ACTION_CANCEL_WINDOW),
+        )
+    }
+
+    /**
      * One-shot voice command, armed ONLY by the in-app pause button: same
      * model prep as driving mode, then a single wake-free English-only
      * window. The service stops itself afterwards unless driving mode is on.
