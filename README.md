@@ -1,6 +1,6 @@
-# HeyTune — hands-free music player (Whistle STT + Needle function calling)
+# HeyTune — pause-to-talk music player (Whistle STT + Needle function calling)
 
-Press your steering-wheel button while driving to **play a song / pause / resume / next /
+Tap **pause** whenever you want to speak to **play a song / resume / next /
 previous / volume / shuffle / like** — fully on-device, no network, using:
 
 - [Whistle](https://cactuscompute.com/blog/whistle) — 16.9 MB on-device speech-to-text (**English-only**, 11 ms to first token)
@@ -23,10 +23,10 @@ App identity: `com.heytune.app` (`Theme.HeyTune`, launcher name **HeyTune**).
 tools.json                      # Needle tool schemas (single source of truth)
 python/                         # Desktop reference pipeline — runs WITHOUT Android
   voice_tools.py                # @needle.tool definitions (mirrors tools.json)
-  pipeline.py                   # wake gate -> transcribe -> complete -> dispatch
+  pipeline.py                   # transcribe (English-only) -> complete -> dispatch
   cli.py                        # try it: text / wav / mic
   download_models.py            # stage native engine into heytune/handsfree/engine/
-tests/test_pipeline.py          # 10 offline tests (no model download needed)
+  tests/test_pipeline.py          # 11 offline tests (no model download needed)
 heytune/                        # App snapshot (OuterTune lite) + integration
   settings.gradle.kts           # includes :handsfree
   app/.../handsfree/VoiceIntegration.kt   # search+play, like, models, service lifecycle
@@ -59,13 +59,13 @@ as GitHub secrets (the app already supports `ot_release` signing config).
 pip install -r python\requirements.txt
 pip install pytest
 python -m pytest tests -q
-python python\cli.py text "hey tune volume to 42" --fallback-only
+python python\cli.py text "volume to 42" --fallback-only
 ```
 
 With models (downloaded once, then offline):
 
 ```bat
-python python\cli.py text "hey tune play Bohemian Rhapsody" --execute
+python python\cli.py text "play Bohemian Rhapsody" --execute
 python python\cli.py wav clip.wav --execute
 python python\cli.py mic
 ```
@@ -77,9 +77,9 @@ python python\cli.py mic
 2. Tap **pause** whenever you want to speak — the music stops (so the mic
    hears no background noise) and one listen window opens. Speak your
    command in English; no wake phrase, no trigger words, no always-on
-   listening. The mic opens only for that window (≤10 s audio, ends on
+   listening, no assistant integration — pause is the only trigger.
+   The mic opens only for that window (≤10 s audio, ends on
    ~1.2 s silence), then the service stops itself.
-   (Steering-wheel button / 🎤 notification action open the same window.)
 3. `needle_complete(audio)` → tool calls; `confidence ≥ 0.50` executes,
    otherwise a confirm notification/TTS, otherwise the offline regex fallback.
    If model and fallback agree on a low-confidence call, it executes
@@ -94,21 +94,6 @@ Car noise: tapping pause stops playback before listening, plus
 silence gate drops steady noise. x86/x86_64 emulator builds assemble with a
 native stub (`nativeAvailable=false`, service refuses to start) since Cactus
 ships no x86 engine.
-
-## Steering-wheel / headset button (digital assistant)
-
-The car button never reaches apps directly — Android routes it to the
-selected *digital assistant*. HeyTune registers one
-(`HeyTuneAssistantService` + headless session): Player → Settings →
-voice section → **Set HeyTune as digital assistant**, then confirm in
-system Settings → Apps → Default apps if asked. A press opens one listen
-window (same as the notification 🎤 action) with no wake phrase; the
-service stops itself afterwards unless driving mode is on.
-
-Caveat: classic Android Auto **projection** reserves its button/mic for
-Gemini/Assistant and won't offer third-party assistants there. The
-assistant path works on the phone itself (Bluetooth, headset button)
-and on AAOS-native head units.
 
 ## Measured behaviour (Needle 3 base, no fine-tune, 2026-10-25)
 

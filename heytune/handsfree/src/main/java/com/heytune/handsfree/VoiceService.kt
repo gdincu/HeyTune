@@ -3,7 +3,6 @@ package com.heytune.handsfree
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
-import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.media.AudioAttributes
@@ -17,10 +16,11 @@ import android.os.SystemClock
 import androidx.core.app.NotificationCompat
 
 /**
- * Pause-to-talk hands-free service (no always-on listening, no wake word).
+ * Pause-to-talk voice service (no always-on listening, no wake word,
+ * no assistant integration).
  *
  * Loop (all on-device, no network):
- *  1. Parked with the mic RELEASED until pause (or wheel/button) arms a window.
+ *  1. Parked with the mic RELEASED until the in-app pause button arms a window.
  *     Tapping pause stops the music first, so the mic hears no background noise.
  *  2. On trigger: open mic, record 16kHz mono until ~1.2s silence
  *     (after speech starts), a 10s cap, or the window timeout.
@@ -42,9 +42,9 @@ class VoiceService : Service() {
         const val ACTION_STOP = "com.heytune.handsfree.STOP"
 
         /**
-         * One-shot listen (pause button, steering-wheel assistant button,
-         * notification action). Opens a wake-free window; the service stops
-         * itself afterwards unless driving mode is on.
+         * One-shot listen, armed ONLY by the in-app pause button. Opens a
+         * wake-free window; the service stops itself afterwards unless
+         * driving mode is on.
          */
         const val ACTION_LISTEN_ONCE = "com.heytune.handsfree.LISTEN_ONCE"
 
@@ -100,7 +100,7 @@ class VoiceService : Service() {
             else -> {
                 settings = VoiceSettings.load(this)
                 if (!settings.enabled || running) return START_STICKY
-                startForeground(NOTIF_ID, notification("Voice ready — press 🎤 or wheel button"))
+                startForeground(NOTIF_ID, notification("Voice ready — tap pause, then speak"))
                 startVoice()
                 return START_STICKY
             }
@@ -133,9 +133,10 @@ class VoiceService : Service() {
 
     // -- main loop ----------------------------------------------------------
     //
-    // Pause/button-triggered only: the thread parks with the mic RELEASED until a
-    // trigger arms a window, captures one utterance, then parks again (or the
-    // service stops when driving mode is off). No always-on listening, no wake word.
+    // Pause-triggered only: the thread parks with the mic RELEASED until the
+    // in-app pause button arms a window, captures one utterance, then parks
+    // again (or the service stops when driving mode is off). No always-on
+    // listening, no wake word, no assistant integration.
 
     private val lock = java.lang.Object()
 
@@ -143,7 +144,7 @@ class VoiceService : Service() {
     private var listenArmed = false
     private var armTime = 0L
 
-    /** Arms one button-triggered window; wakes the parked loop thread. */
+    /** Arms one pause-triggered window; wakes the parked loop thread. */
     private fun armWindow() {
         synchronized(lock) {
             listenArmed = true
@@ -154,7 +155,7 @@ class VoiceService : Service() {
 
     private fun loop() {
         while (running && !Thread.interrupted()) {
-            // Park with the mic released until a button press arms a window.
+            // Park with the mic released until the pause button arms a window.
             try {
                 synchronized(lock) {
                     while (running && !listenArmed) lock.wait()
@@ -166,8 +167,8 @@ class VoiceService : Service() {
             if (!running || Thread.interrupted()) return
             listenArmed = false
             captureOne()
-            // Button-only use: stop after the window unless driving mode
-            // keeps the service alive for the next press.
+            // Pause-only use: stop after the window unless driving mode
+            // keeps the service alive for the next pause press.
             if (!settings.enabled) {
                 stopVoice()
                 stopSelf()
@@ -177,9 +178,9 @@ class VoiceService : Service() {
     }
 
     /**
-     * One bounded capture: mic opens on button press, closes on ~1.2s of
+     * One bounded capture: mic opens on pause press, closes on ~1.2s of
      * silence (after speech starts), a 10s audio cap, or the window timeout.
-     * Gives up after ~5s of pure silence (pressed by accident / too slow).
+     * Gives up after ~5s of pure silence (paused by accident / too slow).
      */
     private fun captureOne() {
         val sampleRate = WakeWordDetector.SAMPLE_RATE
@@ -336,18 +337,11 @@ class VoiceService : Service() {
     }
 
     private fun notification(text: String): Notification {
-        val listen = PendingIntent.getService(
-            this,
-            1,
-            Intent(this, VoiceService::class.java).setAction(ACTION_LISTEN_ONCE),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("HeyTune")
             .setContentText(text)
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .setOngoing(true)
-            .addAction(android.R.drawable.ic_btn_speak_now, "Listen", listen)
             .build()
     }
 

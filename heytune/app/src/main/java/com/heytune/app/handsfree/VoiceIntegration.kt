@@ -144,10 +144,10 @@ object VoiceIntegration {
     fun onPausePressed(activity: MainActivity) = listenOnce(activity)
 
     /**
-     * One-shot voice command (pause button, steering-wheel assistant button
-     * or the notification "Listen" action): same model prep as driving mode,
-     * then a single wake-free window. The service stops itself afterwards
-     * unless driving mode is on. Never touches the driving-mode setting.
+     * One-shot voice command, armed ONLY by the in-app pause button: same
+     * model prep as driving mode, then a single wake-free English-only
+     * window. The service stops itself afterwards unless driving mode is on.
+     * Never touches the driving-mode setting.
      */
     fun listenOnce(activity: MainActivity) {
         activity.lifecycleScope.launch {
@@ -176,7 +176,7 @@ object VoiceIntegration {
     /**
      * Shared model prep: download + load. Returns false on failure (toast
      * shown). No state changes: callers decide what flags to set, so the
-     * button path never touches the driving-mode setting.
+     * pause path never touches the driving-mode setting.
      */
     private suspend fun prepareModels(
         activity: MainActivity,

@@ -172,7 +172,6 @@ fun BottomSheetPlayer(
     Log.v(TAG, "PLR-1")
 
     val context = LocalContext.current
-    val voiceActivity = LocalContext.current as? com.heytune.app.MainActivity
     val currentView = LocalView.current
     val playerConnection = LocalPlayerConnection.current ?: return
     val queueBoard by playerConnection.service.queueBoard.collectAsState()
@@ -642,6 +641,7 @@ fun ControlsContent(
     Log.v(TAG, "PLR-CC-1")
 
     val haptic = LocalHapticFeedback.current
+    val voiceActivity = LocalContext.current as? com.heytune.app.MainActivity
     val playerConnection = LocalPlayerConnection.current ?: return
     val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
 

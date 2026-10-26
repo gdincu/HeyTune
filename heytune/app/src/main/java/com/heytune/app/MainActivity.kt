@@ -14,7 +14,6 @@ import android.app.NotificationManager
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
-import android.view.KeyEvent
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -201,19 +200,6 @@ class MainActivity : ComponentActivity() {
                 Toast.makeText(this, getString(R.string.scanner_missing_storage_perm), Toast.LENGTH_SHORT).show()
             }
         }
-
-    /**
-     * Steering-wheel / headset assistant button: one-shot voice command,
-     * no wake phrase needed. The service stops itself afterwards unless
-     * driving mode is on.
-     */
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        if (keyCode == KeyEvent.KEYCODE_VOICE_ASSIST) {
-            VoiceIntegration.listenOnce(this)
-            return true
-        }
-        return super.onKeyDown(keyCode, event)
-    }
 
     override fun onDestroy() {
         Log.i(MAIN_TAG, "onDestroy() called. isFinishing = $isFinishing")

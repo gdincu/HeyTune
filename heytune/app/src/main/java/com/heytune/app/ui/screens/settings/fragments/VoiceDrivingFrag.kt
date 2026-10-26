@@ -1,19 +1,16 @@
 /*
- * Settings UI for hands-free driving mode.
+ * Settings UI for pause-to-talk voice mode (English-only, in-app only).
  *
  * SPDX-License-Identifier: GPL-3.0
  */
 package com.heytune.app.ui.screens.settings.fragments
 
 import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Mic
-import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
@@ -28,7 +25,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.heytune.app.MainActivity
 import com.heytune.app.R
-import com.heytune.app.assistant.AssistantSetup
 import com.heytune.app.constants.VoiceDrivingModeKey
 import com.heytune.app.handsfree.VoiceIntegration
 import com.heytune.app.ui.component.SwitchPreference
@@ -73,7 +69,6 @@ fun VoiceDrivingFrag() {
             )
         },
     )
-    AssistantRow()
     if (busy) {
         Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
             LinearProgressIndicator(
@@ -81,41 +76,6 @@ fun VoiceDrivingFrag() {
                 modifier = Modifier.fillMaxWidth(),
             )
             Text(stringResource(R.string.voice_downloading_models))
-        }
-    }
-}
-
-/**
- * One-tap shortcut to make HeyTune the system digital assistant, so the
- * steering-wheel / headset voice button routes to HeyTune instead of
- * Google. Hidden where roles are unsupported.
- */
-@Composable
-private fun AssistantRow() {
-    val context = LocalContext.current
-    val activity = context as? MainActivity ?: return
-    if (!AssistantSetup.isRoleAvailable(activity)) return
-    var isDefault by remember { mutableStateOf(AssistantSetup.isDefaultAssistant(activity)) }
-    val roleLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.StartActivityForResult(),
-    ) {
-        // System role dialog returned (granted or not) — refresh from RoleManager.
-        isDefault = AssistantSetup.isDefaultAssistant(activity)
-    }
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Text(stringResource(R.string.voice_assistant_title))
-        Text(
-            text = stringResource(R.string.voice_assistant_desc),
-            modifier = Modifier.padding(bottom = 8.dp),
-        )
-        if (isDefault) {
-            Text(stringResource(R.string.voice_assistant_active))
-        } else {
-            Button(onClick = {
-                AssistantSetup.createRequestIntent(activity)?.let { roleLauncher.launch(it) }
-            }) {
-                Text(stringResource(R.string.voice_assistant_action))
-            }
         }
     }
 }

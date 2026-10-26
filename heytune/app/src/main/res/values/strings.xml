@@ -291,10 +291,6 @@ We recycle translations from upstream, they are pulled periodically. -->
     <string name="voice_mic_denied">Microphone access is required for hands-free mode.</string>
     <string name="voice_started">Voice ready — tap pause, then speak</string>
     <string name="voice_stopped">Hands-free off</string>
-    <string name="voice_assistant_title">Digital assistant</string>
-    <string name="voice_assistant_desc">Route your steering-wheel / headset voice button to HeyTune instead of Google. Works on the phone; Android Auto projection still reserves its button for Google.</string>
-    <string name="voice_assistant_action">Set HeyTune as digital assistant</string>
-    <string name="voice_assistant_active">✓ HeyTune is your digital assistant</string>
     <string name="equalizer">Equalizer</string>
 
     <string name="storage">Storage</string>
