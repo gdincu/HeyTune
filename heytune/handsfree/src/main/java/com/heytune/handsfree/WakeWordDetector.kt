@@ -20,9 +20,6 @@ object WakeWordDetector {
     /** RMS threshold above which a frame counts as speech. Tune per device. */
     var vadThresholdRms: Float = 0.02f
 
-    /** Consecutive speech frames required to open the mic window. */
-    var speechFramesToOpen: Int = 4 // ~320ms
-
     /** Silence frames that close the window. */
     var silenceFramesToClose: Int = 15 // ~1.2s
 

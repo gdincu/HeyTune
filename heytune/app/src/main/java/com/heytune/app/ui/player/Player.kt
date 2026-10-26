@@ -56,7 +56,9 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.FastForward
@@ -72,6 +74,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBarDefaults
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
@@ -642,6 +645,7 @@ fun ControlsContent(
 
     val haptic = LocalHapticFeedback.current
     val voiceActivity = LocalContext.current as? com.heytune.app.MainActivity
+    val listening by com.heytune.handsfree.VoiceService.isListening.collectAsState()
     val playerConnection = LocalPlayerConnection.current ?: return
     val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
 
@@ -976,6 +980,24 @@ fun ControlsContent(
                             .align(Alignment.Center)
                             .size(36.dp)
                     )
+                    // Green mic badge while the pause-opened window has the
+                    // mic open — mirrors the system privacy indicator.
+                    if (listening) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .size(22.dp)
+                                .background(Color(0xFF1E8E3E), CircleShape),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Mic,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(13.dp),
+                            )
+                        }
+                    }
                 }
 
                 Spacer(Modifier.width(8.dp))

@@ -26,7 +26,9 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Pause
@@ -81,6 +83,7 @@ fun MiniPlayer(
     val playerConnection = LocalPlayerConnection.current ?: return
     val context = LocalContext.current
     val voiceActivity = LocalContext.current as? com.heytune.app.MainActivity
+    val listening by com.heytune.handsfree.VoiceService.isListening.collectAsState()
     val queueBoard by playerConnection.queueBoard.collectAsState()
 
     val isPlaying by playerConnection.isPlaying.collectAsState()
@@ -141,31 +144,51 @@ fun MiniPlayer(
                 }
             }
 
-            IconButton(
-                onClick = {
-                    if (playerConnection.player.currentMediaItem == null) {
-                        queueBoard.setCurrQueue()
-                        playerConnection.player.togglePlayPause()
-                    } else if (playbackState == Player.STATE_ENDED) {
-                        playerConnection.player.seekTo(0, 0)
-                        playerConnection.player.playWhenReady = true
-                    } else if (isPlaying) {
-                        // Pause-to-talk: stop music first (no background
-                        // noise), then open one English-only listen window.
-                        playerConnection.player.pause()
-                        voiceActivity?.let {
-                            com.heytune.app.handsfree.VoiceIntegration.onPausePressed(it)
+            Box(contentAlignment = Alignment.Center) {
+                IconButton(
+                    onClick = {
+                        if (playerConnection.player.currentMediaItem == null) {
+                            queueBoard.setCurrQueue()
+                            playerConnection.player.togglePlayPause()
+                        } else if (playbackState == Player.STATE_ENDED) {
+                            playerConnection.player.seekTo(0, 0)
+                            playerConnection.player.playWhenReady = true
+                        } else if (isPlaying) {
+                            // Pause-to-talk: stop music first (no background
+                            // noise), then open one English-only listen window.
+                            playerConnection.player.pause()
+                            voiceActivity?.let {
+                                com.heytune.app.handsfree.VoiceIntegration.onPausePressed(it)
+                            }
+                        } else {
+                            playerConnection.player.play()
                         }
-                    } else {
-                        playerConnection.player.play()
+                    }
+                ) {
+                    Icon(
+                        imageVector = if (playbackState == Player.STATE_ENDED) Icons.Rounded.Replay else if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                        tint = iconButtonColor,
+                        contentDescription = null
+                    )
+                }
+                // Green mic badge while the pause-opened window has the
+                // mic open — mirrors the system privacy indicator.
+                if (listening) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .size(18.dp)
+                            .background(Color(0xFF1E8E3E), CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Mic,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(11.dp),
+                        )
                     }
                 }
-            ) {
-                Icon(
-                    imageVector = if (playbackState == Player.STATE_ENDED) Icons.Rounded.Replay else if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                    tint = iconButtonColor,
-                    contentDescription = null
-                )
             }
 
             IconButton(

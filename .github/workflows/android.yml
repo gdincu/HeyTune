@@ -13,26 +13,6 @@ permissions:
   actions: write
 
 jobs:
-  python-checks:
-    name: Reference pipeline (no Android SDK needed)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-      - name: Install deps
-        run: |
-          pip install -r python/requirements.txt
-          pip install pytest
-      - name: Unit tests
-        run: python -m pytest tests -q
-      - name: tools.json is in sync with app assets
-        run: |
-          diff tools.json heytune/app/src/main/assets/handsfree_tools.json
-          python python/cli.py tools > /dev/null
-          python python/cli.py text "hey tune volume to 42" --fallback-only
-
   build-apk:
     name: Build debug APK (HeyTune)
     runs-on: ubuntu-latest

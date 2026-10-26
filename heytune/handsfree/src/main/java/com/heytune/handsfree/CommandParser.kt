@@ -2,8 +2,7 @@ package com.heytune.handsfree
 
 /**
  * Offline fallback parser: fast regex path used when Needle confidence is
- * below floor or the model is unavailable. Must stay in sync with
- * python/pipeline.py::parse_fallback (same commands, same order).
+ * below floor or the model is unavailable.
  * No wake word: every utterance in the pause-opened window is a command.
  */
 object CommandParser {

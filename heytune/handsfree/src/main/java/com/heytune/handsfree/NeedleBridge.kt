@@ -63,7 +63,7 @@ object NeedleBridge {
         val o = JSONObject(String(bytes, Charsets.UTF_8))
         return VoiceResult(
             audioText = o.optString("text", ""),
-            audioLanguage = o.optString("language", null),
+            audioLanguage = o.optString("language").takeIf { it.isNotEmpty() },
         )
     }
 
@@ -84,8 +84,8 @@ object NeedleBridge {
             suppressedCalls = calls("suppressed_calls"),
             confidence = o.optDouble("confidence", 0.0),
             audioText = o.optString("audio_text", ""),
-            audioLanguage = o.optString("audio_language", null),
-            reasoning = o.optString("reasoning", null),
+            audioLanguage = o.optString("audio_language").takeIf { it.isNotEmpty() },
+            reasoning = o.optString("reasoning").takeIf { it.isNotEmpty() },
         )
     }
 }

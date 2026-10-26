@@ -42,7 +42,9 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -240,6 +242,7 @@ fun BoxScope.QueueContent(
     Log.v("QueueContent", "QC-1")
     val context = LocalContext.current
     val voiceActivity = LocalContext.current as? com.heytune.app.MainActivity
+    val listening by com.heytune.handsfree.VoiceService.isListening.collectAsState()
     val coroutineScope = rememberCoroutineScope()
     val density = LocalDensity.current
     val haptic = LocalHapticFeedback.current
@@ -1053,32 +1056,53 @@ fun BoxScope.QueueContent(
 
                     Spacer(Modifier.width(8.dp))
 
-                    Box(modifier = Modifier.weight(1f)) {
-                        ResizableIconButton(
-                            icon = if (playbackState == STATE_ENDED) Icons.Rounded.Replay else if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                            modifier = Modifier
-                                .size(36.dp)
-                                .align(Alignment.Center),
-                            color = iconButtonColor,
-                            enabled = !detachedHead,
-                            onClick = {
-                                if (playbackState == STATE_ENDED) {
-                                    playerConnection.player.seekTo(0, 0)
-                                    playerConnection.player.playWhenReady = true
-                                } else if (isPlaying) {
-                                    // Pause-to-talk: stop music first (no background
-                                    // noise), then open one English-only listen window.
-                                    playerConnection.player.pause()
-                                    voiceActivity?.let {
-                                        com.heytune.app.handsfree.VoiceIntegration.onPausePressed(it)
+                    Box(
+                        modifier = Modifier.weight(1f),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            ResizableIconButton(
+                                icon = if (playbackState == STATE_ENDED) Icons.Rounded.Replay else if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                                modifier = Modifier.size(36.dp),
+                                color = iconButtonColor,
+                                enabled = !detachedHead,
+                                onClick = {
+                                    if (playbackState == STATE_ENDED) {
+                                        playerConnection.player.seekTo(0, 0)
+                                        playerConnection.player.playWhenReady = true
+                                    } else if (isPlaying) {
+                                        // Pause-to-talk: stop music first (no background
+                                        // noise), then open one English-only listen window.
+                                        playerConnection.player.pause()
+                                        voiceActivity?.let {
+                                            com.heytune.app.handsfree.VoiceIntegration.onPausePressed(it)
+                                        }
+                                    } else {
+                                        playerConnection.player.play()
                                     }
-                                } else {
-                                    playerConnection.player.play()
+                                    // play/pause is slightly harder haptic
+                                    haptic.performHapticFeedback(HapticFeedbackType.Confirm)
                                 }
-                                // play/pause is slightly harder haptic
-                                haptic.performHapticFeedback(HapticFeedbackType.Confirm)
+                            )
+                            // Green mic badge while the pause-opened window has
+                            // the mic open — mirrors the system privacy indicator.
+                            if (listening) {
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .size(18.dp)
+                                        .background(Color(0xFF1E8E3E), CircleShape),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Mic,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(11.dp),
+                                    )
+                                }
                             }
-                        )
+                        }
                     }
 
                     Spacer(Modifier.width(8.dp))

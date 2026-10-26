@@ -3,19 +3,12 @@ package com.heytune.handsfree
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
-import kotlin.test.assertTrue
 
-/** Mirrors tests/test_pipeline.py. Run in Android Studio (needs SDK). */
+/** Voice-pipeline checks. Run in Android Studio (needs SDK). */
 class HandsFreeTest {
 
     @Test fun englishOnly() {
         assertEquals("en", VoiceTools.VOICE_LANGUAGE)
-    }
-
-    @Test fun noWakeGate() {
-        // No wake word: pause is the trigger, shims stay passive.
-        assertTrue(VoiceTools.hasWake("play X"))
-        assertEquals("play X", VoiceTools.stripWake("play X"))
     }
 
     @Test fun fallbackCommands() {

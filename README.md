@@ -1,111 +1,112 @@
-# HeyTune — pause-to-talk music player (Whistle STT + Needle function calling)
+# HeyTune — pause-to-talk music player
 
-Tap **pause** whenever you want to speak to **play a song / resume / next /
-previous / volume / shuffle / like** — fully on-device, no network, using:
+HeyTune plays the music stored on your phone and lets you control it with
+your voice. There is no wake word and nothing is always listening: you tap
+**pause**, say what you want in English, and the app does it — fully
+on-device, no network needed.
 
-- [Whistle](https://cactuscompute.com/blog/whistle) — 16.9 MB on-device speech-to-text (**English-only**, 11 ms to first token)
-- [Needle 3](https://cactuscompute.com/needle) — 8–29 MB on-device function caller
+## What you need
 
-One C++ engine loads both `.cact` files; `needle_complete(audio)` returns
-tool calls + `audio_text` in a single call, so the transcript never leaves the device.
+- An Android phone (ARM — arm64 or armv7 — which is virtually every phone).
+- Your music files on the device (HeyTune plays your local library).
+- Microphone permission (only used in the short moment after you tap pause).
+- About 45 MB of free space once, for the offline voice models.
+- English commands — other languages are not supported.
 
-> HeyTune is a rebrand of an `OuterTune/OuterTune` (`lite`, local-playback
-> only) snapshot with voice integration applied; the same patches apply to
-> active forks (`Metrolist`, `InterTune`, …). Upstream files under `heytune/`
-> keep their original copyright headers and docs.
+## Install it
 
-App identity: `com.heytune.app` (`Theme.HeyTune`, launcher name **HeyTune**).
+1. Open this repo's **Actions** tab and pick the latest successful run of
+   the `android` workflow.
+2. Download the **HeyTune-debug** artifact and install the APK on your
+   phone (allow "install unknown apps" when asked).
+3. Open HeyTune and let it scan your music library.
 
-## Layout
+No Play Store, no account, no sign-in.
+
+## Set up voice control (one time)
+
+1. In HeyTune, go to **Player → Settings** and turn on the voice mode
+   toggle.
+2. Allow microphone access when asked.
+3. Wait for the voice models to download (~45 MB, once). Leave the app
+   open until it finishes — if it fails, check your connection and try
+   the toggle again.
+
+## Use it
+
+1. Whenever music is playing and you want something, tap the **pause**
+   button (in the full player, the mini player, or the queue screen).
+   The music stops so the microphone hears only you.
+2. A "Listening… speak now" message appears — just speak your command.
+   While the microphone is open you will see two green indicators: the
+   phone's own green mic dot at the top of the screen (shown by Android
+   whenever any app uses the mic) and a small green mic badge on the
+   pause button inside the app. When they disappear, the moment has
+   passed — just tap pause again.
+3. The app carries it out. If it wasn't sure what you said, it tells you
+   what it heard instead of guessing.
+
+Tap pause to talk, every time. Pausing first is the whole trick: no
+background music means the app understands you much better, and there is
+never a microphone listening in the background.
+
+## What you can say
+
+Speak naturally in English. For example:
+
+- "play Bohemian Rhapsody" — find a song, artist, or album in your
+  library and play it
+- "resume" / "continue playing" — keep playing after a pause
+- "next" / "skip" — jump to the next track
+- "go back" / "previous" — go back a track
+- "volume to 50" / "louder" / "quieter" — set the volume (0–100)
+- "shuffle on" / "shuffle off" / "stop shuffling" — control shuffle
+- "like this song" — favourite the current song
+
+Anything else is ignored with a short message saying what was heard.
+
+## Your privacy
+
+Everything happens on your phone: speech recognition (Whistle) and
+command understanding (Needle 3) both run on-device. Your voice and
+commands never leave the device, and the microphone is only open in the
+few seconds after you tap pause.
+
+## If something goes wrong
+
+- **"Voice models not ready"** — turn the voice toggle off and on again
+  with a working connection so the ~45 MB download can finish.
+- **"Microphone access is required"** — grant the permission in your
+  phone's Settings → Apps → HeyTune → Permissions.
+- **"Voice engine unavailable on this device"** — you are likely on an
+  emulator or an x86 device, which the voice engine does not support.
+  Use a regular ARM Android phone.
+- **It heard me but did nothing** — rephrase more simply (e.g. "next",
+  "volume to 40"). Background noise and mumbling are the usual culprits;
+  make sure the music actually paused first.
+
+## For developers
+
+HeyTune is built from an OuterTune (`lite`, local-playback only) snapshot
+with voice integration added; the same approach applies to active forks
+(`Metrolist`, `InterTune`, …). Upstream files under `heytune/` keep their
+original copyright headers and docs. App identity: `com.heytune.app`
+(`Theme.HeyTune`, launcher name **HeyTune**).
 
 ```
-.github/workflows/android.yml   # CI: python checks + handsfree tests + debug APK
-tools.json                      # Needle tool schemas (single source of truth)
-python/                         # Desktop reference pipeline — runs WITHOUT Android
-  voice_tools.py                # @needle.tool definitions (mirrors tools.json)
-  pipeline.py                   # transcribe (English-only) -> complete -> dispatch
-  cli.py                        # try it: text / wav / mic
-  download_models.py            # stage native engine into heytune/handsfree/engine/
-  tests/test_pipeline.py          # 11 offline tests (no model download needed)
-heytune/                        # App snapshot (OuterTune lite) + integration
+heytune/                        # App snapshot + integration
   settings.gradle.kts           # includes :handsfree
   app/.../handsfree/VoiceIntegration.kt   # search+play, like, models, service lifecycle
   app/.../settings/fragments/VoiceDrivingFrag.kt  # Player settings toggle
-  app/src/main/assets/handsfree_tools.json  # == ../../tools.json (CI diffs them)
+  app/src/main/assets/handsfree_tools.json  # voice command definitions
   handsfree/                    # :handsfree Android library module
-    VoiceService.kt             # foreground mic service, VAD-gated, music ducking
+    VoiceService.kt             # foreground mic service, pause-triggered, music ducking
     ModelManager.kt             # downloads whistle.cact + needle3.cact on first enable
     NeedleBridge.kt + src/main/cpp/needle_bridge.cpp  # JNI -> libneedle.a
     PlayerBridge.kt / VoiceTools.kt / CommandParser.kt / WakeWordDetector.kt
 ```
 
-## Build the APK (GitHub Actions)
-
-Push this repo to GitHub — the `android` workflow does everything:
-
-1. **python-checks**: pytest + `tools.json` ↔ app-assets sync check.
-2. **build-apk**: JDK 21, Android SDK 37, NDK `27.0.12077973`, CMake `3.22.1`,
-   `needle download android-arm64/android-armv7` (staged to
-   `handsfree/engine/…`), model-URL reachability check,
-   `:handsfree:testDebugUnitTest`, `:app:assembleCoreDebug`.
-3. Debug APKs (`HeyTune-…apk`) uploaded as artifact `HeyTune-debug`.
-
-No keystore needed for debug. For a signed release, add `keystore.properties`
-as GitHub secrets (the app already supports `ot_release` signing config).
-
-## Try the voice pipeline on desktop (no phone needed)
-
-```bat
-pip install -r python\requirements.txt
-pip install pytest
-python -m pytest tests -q
-python python\cli.py text "volume to 42" --fallback-only
-```
-
-With models (downloaded once, then offline):
-
-```bat
-python python\cli.py text "play Bohemian Rhapsody" --execute
-python python\cli.py wav clip.wav --execute
-python python\cli.py mic
-```
-
-## How it works on device
-
-1. Player → Settings → **Hands-free driving mode** on (mic permission →
-   downloads `whistle.cact` + `needle3.cact` once, ~45 MB).
-2. Tap **pause** whenever you want to speak — the music stops (so the mic
-   hears no background noise) and one listen window opens. Speak your
-   command in English; no wake phrase, no trigger words, no always-on
-   listening, no assistant integration — pause is the only trigger.
-   The mic opens only for that window (≤10 s audio, ends on
-   ~1.2 s silence), then the service stops itself.
-3. `needle_complete(audio)` → tool calls; `confidence ≥ 0.50` executes,
-   otherwise a confirm notification/TTS, otherwise the offline regex fallback.
-   If model and fallback agree on a low-confidence call, it executes
-   (agreement upgrade — no driver nagging).
-4. `PlayerBridge` dispatches via `MediaController`:
-   pause/resume/next/previous/volume/shuffle/like directly;
-   `play X` searches the local library (`searchSongs` + `searchArtistSongs`),
-   enqueues a `ListQueue` and plays the first hit.
-
-Car noise: tapping pause stops playback before listening, plus
-`VOICE_RECOGNITION` source + transient music ducking; Whistle's
-silence gate drops steady noise. x86/x86_64 emulator builds assemble with a
-native stub (`nativeAvailable=false`, service refuses to start) since Cactus
-ships no x86 engine.
-
-## Measured behaviour (Needle 3 base, no fine-tune, 2026-10-25)
-
-| command | call | confidence | decision |
-|---|---|---|---|
-| play Bohemian Rhapsody | `play_song` ✓ args | 0.855 | execute |
-| next song | `next_track` | 0.836 | execute |
-| stop shuffling | `toggle_shuffle(off)` | 0.799 | execute |
-| shuffle on / off | `toggle_shuffle` ✓ | 0.903 / 0.772 | execute |
-| volume to 50 | `set_volume(50)` | 0.644 | execute¹ |
-| pause the music | `pause_playback` | 0.43–0.61 | execute¹ |
-| silence (Whistle) | empty transcript | — | ignored |
-
-¹ via agreement upgrade. `EXECUTE_AT = 0.50`. Fine-tuning on these 8 tools
-(`needle finetune` / Cactus Platform, +18–36 pts) is the long-tail fix.
+Pushing to GitHub runs the `android` workflow: it stages the native
+engine for arm64/armv7, checks the model URLs, compiles everything, and
+uploads debug APKs as the `HeyTune-debug` artifact. No keystore is needed
+for debug builds.

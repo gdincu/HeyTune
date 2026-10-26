@@ -14,6 +14,8 @@ import android.os.Build
 import android.os.IBinder
 import android.os.SystemClock
 import androidx.core.app.NotificationCompat
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * Pause-to-talk voice service (no always-on listening, no wake word,
@@ -53,6 +55,14 @@ class VoiceService : Service() {
 
         /** Host app injects its MediaController-backed bridge before start. */
         var playerBridge: PlayerBridge? = null
+
+        /**
+         * True while a pause-opened window has the mic open. The app UI
+         * collects this to show a green mic badge, mirroring the system
+         * privacy indicator.
+         */
+        private val _isListening = MutableStateFlow(false)
+        val isListening: StateFlow<Boolean> = _isListening
     }
 
     private var running = false
@@ -119,6 +129,7 @@ class VoiceService : Service() {
 
     private fun stopVoice() {
         running = false
+        _isListening.value = false
         listenArmed = false
         synchronized(lock) { lock.notifyAll() }
         worker?.interrupt()
@@ -204,6 +215,7 @@ class VoiceService : Service() {
         }
         if (record.state != AudioRecord.STATE_INITIALIZED) return
         record.startRecording()
+        _isListening.value = true
 
         val frame = ShortArray(WakeWordDetector.FRAME_SAMPLES)
         val window = ArrayDeque<Short>()
@@ -235,6 +247,7 @@ class VoiceService : Service() {
                 if (speechSeen && silenceStreak >= WakeWordDetector.silenceFramesToClose) break
             }
         } finally {
+            _isListening.value = false
             try { record.stop() } catch (_: Exception) {}
             record.release()
             abandonDuck()
@@ -273,7 +286,6 @@ class VoiceService : Service() {
                         notify("✔ ${calls.firstOrNull()?.name} (confirmed)")
                     } else {
                         notify("Heard '${result.audioText}' — tap to confirm")
-                        onConfirmRequest?.invoke(result)
                     }
                 }
                 VoiceDecision.REFUSE -> fallback(result.audioText, bridge)
@@ -293,9 +305,6 @@ class VoiceService : Service() {
         bridge.dispatch(listOf(call))
         notify("✔ ${call.name} (offline)")
     }
-
-    /** Host UI (confirm dialog / TTS) hooks here. */
-    var onConfirmRequest: ((VoiceResult) -> Unit)? = null
 
     // -- audio focus / notification ------------------------------------------
 

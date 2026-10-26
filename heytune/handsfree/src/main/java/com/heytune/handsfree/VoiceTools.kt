@@ -1,6 +1,6 @@
 package com.heytune.handsfree
 
-/** Single music-control tool call, mirrors tools.json + python/voice_tools.py. */
+/** Single music-control tool call, mirrors app/src/main/assets/handsfree_tools.json. */
 data class ToolCall(val name: String, val arguments: Map<String, Any?> = emptyMap())
 
 /** Needle complete() response subset we route on. */
@@ -25,12 +25,6 @@ object VoiceTools {
 
     /** Whistle is fixed to English: no auto-detect, no other languages. */
     const val VOICE_LANGUAGE = "en"
-
-    /** Deprecated: no wake word anymore (pause is the trigger). Always true. */
-    fun hasWake(text: String): Boolean = true
-
-    /** Deprecated: no wake word to strip. Returns text unchanged (trimmed). */
-    fun stripWake(text: String): String = text.trim()
 
     fun route(result: VoiceResult): Pair<VoiceDecision, List<ToolCall>> {
         if (result.functionCalls.isNotEmpty() && result.confidence >= EXECUTE_AT) {
