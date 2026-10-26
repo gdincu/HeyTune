@@ -1,17 +1,16 @@
 package com.heytune.handsfree
 
-import kotlin.math.abs
 import kotlin.math.sqrt
 
 /**
- * Lightweight always-on gate: RMS energy VAD + wake-phrase text check.
+ * Pause-to-talk gate: RMS energy VAD only, no wake phrase.
  *
  * Audio path: AudioRecord @16kHz mono -> 80ms frames (1280 samples) ->
- * VAD -> ring buffer -> Whistle transcribe -> [WakeWordDetector.isWake] on text.
+ * VAD -> ring buffer -> Whistle (English-only) transcribe.
  *
- * Keep Whistle (16.9MB) OFF until VAD fires, and Needle tool-calling OFF
- * until the wake phrase is in the transcript. Music especially can decode
- * as text, so never act on non-wake audio (Cactus guidance).
+ * Trigger model: the user taps pause (music stops, so the mic hears no
+ * background noise), which opens one listen window. Nothing is always
+ * listening and no trigger word is awaited.
  */
 object WakeWordDetector {
 
@@ -38,9 +37,9 @@ object WakeWordDetector {
 
     fun isSpeech(frame: ShortArray): Boolean = rms(frame) > vadThresholdRms
 
-    fun isWake(transcript: String): Boolean = VoiceTools.hasWake(transcript)
-
     /** Peak-normalise int16 mono to [-1,1] floats for needle_transcribe. */
     fun toFloatMono(pcm: ShortArray): FloatArray =
         FloatArray(pcm.size) { abs(pcm[it] / 32768f).coerceAtMost(1f) * if (pcm[it] < 0) -1f else 1f }
+
+    private fun abs(x: Float): Float = if (x < 0) -x else x
 }

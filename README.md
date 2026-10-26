@@ -3,7 +3,7 @@
 Press your steering-wheel button while driving to **play a song / pause / resume / next /
 previous / volume / shuffle / like** — fully on-device, no network, using:
 
-- [Whistle](https://cactuscompute.com/blog/whistle) — 16.9 MB on-device speech-to-text (7 languages, 11 ms to first token)
+- [Whistle](https://cactuscompute.com/blog/whistle) — 16.9 MB on-device speech-to-text (**English-only**, 11 ms to first token)
 - [Needle 3](https://cactuscompute.com/needle) — 8–29 MB on-device function caller
 
 One C++ engine loads both `.cact` files; `needle_complete(audio)` returns
@@ -74,10 +74,12 @@ python python\cli.py mic
 
 1. Player → Settings → **Hands-free driving mode** on (mic permission →
    downloads `whistle.cact` + `needle3.cact` once, ~45 MB).
-2. Press your steering-wheel assistant button (or the 🎤 notification
-   action) and speak a command — no wake phrase needed. The mic opens
-   only for that window (≤10 s audio, ends on ~1.2 s silence), then the
-   service stops itself. Nothing is always listening.
+2. Tap **pause** whenever you want to speak — the music stops (so the mic
+   hears no background noise) and one listen window opens. Speak your
+   command in English; no wake phrase, no trigger words, no always-on
+   listening. The mic opens only for that window (≤10 s audio, ends on
+   ~1.2 s silence), then the service stops itself.
+   (Steering-wheel button / 🎤 notification action open the same window.)
 3. `needle_complete(audio)` → tool calls; `confidence ≥ 0.50` executes,
    otherwise a confirm notification/TTS, otherwise the offline regex fallback.
    If model and fallback agree on a low-confidence call, it executes
@@ -87,7 +89,8 @@ python python\cli.py mic
    `play X` searches the local library (`searchSongs` + `searchArtistSongs`),
    enqueues a `ListQueue` and plays the first hit.
 
-Car noise: `VOICE_RECOGNITION` source + transient music ducking; Whistle's
+Car noise: tapping pause stops playback before listening, plus
+`VOICE_RECOGNITION` source + transient music ducking; Whistle's
 silence gate drops steady noise. x86/x86_64 emulator builds assemble with a
 native stub (`nativeAvailable=false`, service refuses to start) since Cactus
 ships no x86 engine.

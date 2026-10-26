@@ -50,6 +50,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -78,6 +79,7 @@ fun MiniPlayer(
     modifier: Modifier = Modifier,
 ) {
     val playerConnection = LocalPlayerConnection.current ?: return
+    val context = LocalContext.current
     val queueBoard by playerConnection.queueBoard.collectAsState()
 
     val isPlaying by playerConnection.isPlaying.collectAsState()
@@ -146,8 +148,15 @@ fun MiniPlayer(
                     } else if (playbackState == Player.STATE_ENDED) {
                         playerConnection.player.seekTo(0, 0)
                         playerConnection.player.playWhenReady = true
+                    } else if (isPlaying) {
+                        // Pause-to-talk: stop music first (no background
+                        // noise), then open one English-only listen window.
+                        playerConnection.player.pause()
+                        (context as? com.heytune.app.MainActivity)?.let {
+                            com.heytune.app.handsfree.VoiceIntegration.onPausePressed(it)
+                        }
                     } else {
-                        playerConnection.player.togglePlayPause()
+                        playerConnection.player.play()
                     }
                 }
             ) {

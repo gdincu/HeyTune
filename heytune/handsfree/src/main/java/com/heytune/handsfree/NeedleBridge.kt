@@ -45,18 +45,18 @@ object NeedleBridge {
         }
     }
 
-    fun completeAudio(samples: FloatArray, language: String?): VoiceResult? {
+    fun completeAudio(samples: FloatArray, language: String? = VoiceTools.VOICE_LANGUAGE): VoiceResult? {
         val bytes = try {
-            nativeCompleteAudio(samples, language)
+            nativeCompleteAudio(samples, language ?: VoiceTools.VOICE_LANGUAGE)
         } catch (_: UnsatisfiedLinkError) {
             return null
         } ?: return null
         return parseEngineJson(String(bytes, Charsets.UTF_8))
     }
 
-    fun transcribe(samples: FloatArray, language: String?): VoiceResult? {
+    fun transcribe(samples: FloatArray, language: String? = VoiceTools.VOICE_LANGUAGE): VoiceResult? {
         val bytes = try {
-            nativeTranscribe(samples, language)
+            nativeTranscribe(samples, language ?: VoiceTools.VOICE_LANGUAGE)
         } catch (_: UnsatisfiedLinkError) {
             return null
         } ?: return null

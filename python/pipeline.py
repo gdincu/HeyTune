@@ -1,13 +1,18 @@
-"""Always-on voice pipeline: wake-word gate -> Whistle STT -> Needle tools.
+"""Pause-to-talk voice pipeline: Whistle STT (English-only) -> Needle tools.
 
 Mirrors the Android implementation in
 handsfree-android/.../VoiceService.kt + CommandParser.kt.
+
+Trigger model: the user taps pause (music stops, so the mic hears no
+background noise), which opens one listen window. There is NO wake word
+and NO always-on listening. Every non-empty English transcript in that
+window is treated as a command.
 
 On device the C API does audio->calls in one call (needle_complete).
 On desktop the Python package does it in two steps, which is what
 transcribe_then_complete() implements:
 
-    text = needle.transcribe(wav)["text"]
+    text = needle.transcribe(wav, language="en")["text"]
     result = agent.complete(text)
 """
 
@@ -17,12 +22,9 @@ import re
 from dataclasses import dataclass
 from typing import Any, Callable
 
-# The wake phrase is "hey tune" (two words, word-boundary matched: bare
-# "hey", "they", "whey" etc. must NOT trigger). Anything after it is the
-# command; "hey tune" alone is ignored.
-WAKE_WORD = "hey tune"
-_WAKE_RE = re.compile(r"\bhey[\s,\-]+tunes?\b", re.IGNORECASE)
-_WAKE_LEAD_RE = re.compile(r"^\s*hey[\s,\-]+tunes?\b[\s,.!:-]*", re.IGNORECASE)
+# Whistle is fixed to English: no auto-detect, no other languages.
+# All transcribe calls must pass language="en".
+VOICE_LANGUAGE = "en"
 
 # Confidence routing thresholds (Cactus guide: act / confirm / refuse).
 # Calibrated 2026-10-25 on Needle 3 base (no fine-tune):
@@ -36,12 +38,13 @@ CONFIRM_AT = 0.10  # engine floor; below -> suppressed_calls
 
 
 def has_wake(text: str) -> bool:
-    return _WAKE_RE.search(text.strip()) is not None
+    """Deprecated shim: no wake word anymore. Always True (pause is the trigger)."""
+    return True
 
 
 def strip_wake(text: str) -> str:
-    """Remove a leading wake word so the command parses cleanly."""
-    return _WAKE_LEAD_RE.sub("", text.strip())
+    """Deprecated shim: no wake word to strip. Returns text unchanged (trimmed)."""
+    return text.strip()
 
 
 @dataclass
@@ -82,7 +85,7 @@ _PATTERNS: list[tuple[str, re.Pattern, Callable[[re.Match], dict]]] = [
 
 def parse_fallback(text: str) -> ParsedCall | None:
     """Parse a command without any model. Returns None if unrecognised."""
-    t = strip_wake(text).strip()
+    t = text.strip()
     if not t:
         return None
     for name, pattern, args in _PATTERNS:
@@ -92,7 +95,7 @@ def parse_fallback(text: str) -> ParsedCall | None:
             if name == "play_song" and not str(q.get("query", "")).strip():
                 continue
             return ParsedCall(name=name, arguments=q)
-    # Bare wake ("hey tune") or anything else unrecognised -> None (ignored).
+    # Bare unrecognised input -> None (ignored).
     return None
 
 
@@ -120,41 +123,36 @@ def transcribe_then_complete(
     audio,
     agent=None,
     transcribe_fn: Callable[..., dict] | None = None,
-    language: str | None = None,
+    language: str | None = VOICE_LANGUAGE,
     keywords: list[str] | None = None,
-    require_wake: bool = True,
+    require_wake: bool | None = None,
     fallback_on_low_confidence: bool = True,
 ) -> dict[str, Any]:
-    """Transcribe a clip with Whistle, answer it with Needle.
+    """Transcribe a clip with Whistle (English-only), answer it with Needle.
 
     audio: wav path or 16kHz mono float samples (whatever needle.transcribe takes).
+    language: always "en" (any other value is coerced to "en").
+    keywords/require_wake: deprecated no-ops (no trigger words). Kept only so
+    old callers don't crash; they are ignored.
     Returns a dict like the C engine: function_calls, confidence, audio_text,
     audio_language, decision (execute|confirm|refuse|ignored|fallback).
     """
     import needle as _needle  # local import so pure helpers stay import-light
 
     t_fn = transcribe_fn or _needle.transcribe
-    stt = t_fn(audio, language=language, keywords=keywords)
+    # English-only: force "en" regardless of caller input.
+    stt = t_fn(audio, language=VOICE_LANGUAGE)
     text = (stt.get("text") or "").strip()
-    lang = stt.get("language")
+    lang = stt.get("language") or VOICE_LANGUAGE
 
     if not text:
         return {"decision": "ignored", "reason": "silence",
                 "audio_text": text, "audio_language": lang,
                 "function_calls": []}
-    if require_wake and not has_wake(text):
-        return {"decision": "ignored", "reason": "no-wake-word",
-                "audio_text": text, "audio_language": lang,
-                "function_calls": []}
 
-    command = strip_wake(text) if require_wake else text
-
-    if require_wake and not command:
-        # Bare "hey tune" with nothing after it: attention, not a command.
-        # Ignore without spending a Needle call.
-        return {"decision": "ignored", "reason": "wake-only",
-                "audio_text": text, "audio_language": lang,
-                "function_calls": []}
+    # No wake gate: pause is the trigger, so every utterance in the window
+    # is a command.
+    command = text
 
     ag = agent
     if ag is None:

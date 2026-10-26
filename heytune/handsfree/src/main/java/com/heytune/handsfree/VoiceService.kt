@@ -17,14 +17,15 @@ import android.os.SystemClock
 import androidx.core.app.NotificationCompat
 
 /**
- * Button-triggered hands-free service for driving (no always-on listening).
+ * Pause-to-talk hands-free service (no always-on listening, no wake word).
  *
  * Loop (all on-device, no network):
- *  1. Parked with the mic RELEASED until a press arms a window
- *     (steering-wheel assistant button, notification action).
- *  2. On press: open mic, record 16kHz mono until ~1.2s silence
+ *  1. Parked with the mic RELEASED until pause (or wheel/button) arms a window.
+ *     Tapping pause stops the music first, so the mic hears no background noise.
+ *  2. On trigger: open mic, record 16kHz mono until ~1.2s silence
  *     (after speech starts), a 10s cap, or the window timeout.
- *  3. Whistle transcribes; no wake phrase required inside a window.
+ *  3. Whistle (English-only, language="en") transcribes; every non-empty
+ *     transcript in the window is a command — no wake phrase required.
  *  4. needle_complete(audio) -> tool calls; EXECUTE>=0.50, CONFIRM shows
  *     notification/TTS, REFUSE -> fallback regex parser.
  *  5. Dispatch via PlayerBridge (MediaController -> MusicService).
@@ -41,9 +42,9 @@ class VoiceService : Service() {
         const val ACTION_STOP = "com.heytune.handsfree.STOP"
 
         /**
-         * One-shot listen (steering-wheel assistant button, notification
-         * action). Opens a wake-free window; the service stops itself
-         * afterwards unless driving mode is on.
+         * One-shot listen (pause button, steering-wheel assistant button,
+         * notification action). Opens a wake-free window; the service stops
+         * itself afterwards unless driving mode is on.
          */
         const val ACTION_LISTEN_ONCE = "com.heytune.handsfree.LISTEN_ONCE"
 
@@ -132,9 +133,9 @@ class VoiceService : Service() {
 
     // -- main loop ----------------------------------------------------------
     //
-    // Button-triggered only: the thread parks with the mic RELEASED until a
-    // press arms a window, captures one utterance, then parks again (or the
-    // service stops when driving mode is off). No always-on listening.
+    // Pause/button-triggered only: the thread parks with the mic RELEASED until a
+    // trigger arms a window, captures one utterance, then parks again (or the
+    // service stops when driving mode is off). No always-on listening, no wake word.
 
     private val lock = java.lang.Object()
 
@@ -246,15 +247,15 @@ class VoiceService : Service() {
         val samples = WakeWordDetector.toFloatMono(pcm)
         val bridge = playerBridge ?: return
 
-        // Button-triggered window: no wake gate at all. stripWake is still
-        // applied so a habitual "hey tune ..." prefix never leaks into commands.
+        // Pause-triggered window: no wake gate at all — the whole transcript
+        // is the command. Whistle is English-only (VoiceTools.VOICE_LANGUAGE).
         // 1) Engine path: audio -> tool calls in one call.
         val result = try {
-            NeedleBridge.completeAudio(samples, settings.language)
+            NeedleBridge.completeAudio(samples, VoiceTools.VOICE_LANGUAGE)
         } catch (_: Exception) { null }
 
         if (result != null) {
-            val command = VoiceTools.stripWake(result.audioText)
+            val command = result.audioText.trim()
             if (command.isBlank()) return // nothing said
             val (decision, calls) = VoiceTools.route(result)
             when (decision) {

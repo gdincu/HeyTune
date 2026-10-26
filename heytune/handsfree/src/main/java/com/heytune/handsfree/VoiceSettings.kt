@@ -5,8 +5,7 @@ import android.content.Context
 /** Persisted driving-mode settings (DataStore/Proto omitted for brevity). */
 data class VoiceSettings(
     val enabled: Boolean = false, // user must opt in: mic is sensitive
-    val language: String? = null, // null = auto-detect (en/de/fr/es/it/nl/pl)
-    val keywords: List<String> = emptyList(), // artist names for Whistle biasing
+    val language: String = VoiceTools.VOICE_LANGUAGE, // fixed "en": Whistle English-only
     val duckMusic: Boolean = true,
     val confirmThreshold: Double = VoiceTools.CONFIRM_AT,
 ) {
@@ -17,8 +16,9 @@ data class VoiceSettings(
             val p = ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE)
             return VoiceSettings(
                 enabled = p.getBoolean("enabled", false),
-                language = p.getString("language", null),
-                keywords = p.getStringSet("keywords", emptySet())!!.toList(),
+                // Force "en" even if an old install stored null/auto-detect.
+                language = p.getString("language", VoiceTools.VOICE_LANGUAGE)
+                    ?: VoiceTools.VOICE_LANGUAGE,
                 duckMusic = p.getBoolean("duck", true),
             )
         }
@@ -27,8 +27,7 @@ data class VoiceSettings(
     fun save(ctx: Context) {
         ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE).edit()
             .putBoolean("enabled", enabled)
-            .putString("language", language)
-            .putStringSet("keywords", keywords.toSet())
+            .putString("language", VoiceTools.VOICE_LANGUAGE)
             .putBoolean("duck", duckMusic)
             .apply()
     }

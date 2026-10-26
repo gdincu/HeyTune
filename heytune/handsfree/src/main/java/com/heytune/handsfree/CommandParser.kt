@@ -4,6 +4,7 @@ package com.heytune.handsfree
  * Offline fallback parser: fast regex path used when Needle confidence is
  * below floor or the model is unavailable. Must stay in sync with
  * python/pipeline.py::parse_fallback (same commands, same order).
+ * No wake word: every utterance in the pause-opened window is a command.
  */
 object CommandParser {
 
@@ -12,7 +13,7 @@ object CommandParser {
     private val playQuery = Regex("""\b(?:play|put on|start)\b\s+(?<query>.+)$""", RegexOption.IGNORE_CASE)
 
     fun parse(text: String): ToolCall? {
-        val t = VoiceTools.stripWake(text).trim()
+        val t = text.trim()
         if (t.isEmpty()) return null
         val low = t.lowercase()
 

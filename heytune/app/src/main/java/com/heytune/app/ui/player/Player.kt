@@ -953,8 +953,15 @@ fun ControlsContent(
                             } else if (playbackState == STATE_ENDED) {
                                 playerConnection.player.seekTo(0, 0)
                                 playerConnection.player.playWhenReady = true
+                            } else if (isPlaying) {
+                                // Pause-to-talk: stop music first (no background
+                                // noise), then open one English-only listen window.
+                                playerConnection.player.pause()
+                                (context as? com.heytune.app.MainActivity)?.let {
+                                    com.heytune.app.handsfree.VoiceIntegration.onPausePressed(it)
+                                }
                             } else {
-                                playerConnection.player.togglePlayPause()
+                                playerConnection.player.play()
                             }
                             // play/pause is slightly harder haptic
                             haptic.performHapticFeedback(HapticFeedbackType.Confirm)

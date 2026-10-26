@@ -93,8 +93,10 @@ Java_com_heytune_handsfree_NeedleBridge_nativeCompleteAudio(JNIEnv *env, jobject
     std::vector<float> pcm((size_t)len);
     env->GetFloatArrayRegion(samples, 0, len, pcm.data());
     const char *lang = language ? env->GetStringUTFChars(language, nullptr) : nullptr;
+    // English-only: null/empty coerced to "en", no keyword biasing.
+    const char *eff = (lang && lang[0] != '\0') ? lang : "en";
 
-    needle_set_audio(lang, nullptr, 0);
+    needle_set_audio(eff, nullptr, 0);
     std::string out(256 * 1024, '\0');
     int rc = needle_complete(nullptr, pcm.data(), (int)pcm.size(), 512, out.data(),
                              (int)out.size());
@@ -115,9 +117,11 @@ Java_com_heytune_handsfree_NeedleBridge_nativeTranscribe(JNIEnv *env, jobject /*
     std::vector<float> pcm((size_t)len);
     env->GetFloatArrayRegion(samples, 0, len, pcm.data());
     const char *lang = language ? env->GetStringUTFChars(language, nullptr) : nullptr;
+    // English-only: null/empty coerced to "en", no keyword biasing.
+    const char *eff = (lang && lang[0] != '\0') ? lang : "en";
 
     std::string out(64 * 1024, '\0');
-    int rc = needle_transcribe(pcm.data(), (int)pcm.size(), lang, nullptr, 0, out.data(),
+    int rc = needle_transcribe(pcm.data(), (int)pcm.size(), eff, nullptr, 0, out.data(),
                                (int)out.size());
     if (language) env->ReleaseStringUTFChars(language, lang);
     if (rc < 0) return nullptr;

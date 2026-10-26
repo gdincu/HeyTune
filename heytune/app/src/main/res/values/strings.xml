@@ -285,11 +285,11 @@ We recycle translations from upstream, they are pulled periodically. -->
     <string name="auto_skip_next_on_error_desc">Ensure your continuous playback experience</string>
     <string name="stop_music_on_task_clear">Stop music on task clear</string>
     <string name="voice_driving_title">Hands-free driving mode</string>
-    <string name="voice_driving_desc">Hands-free voice control for driving. Press your steering-wheel button or the 🎤 action, then speak your command. Runs 100% on-device, no network.</string>
+    <string name="voice_driving_desc">Pause-to-talk voice control (English only). Tap pause — the music stops so the mic hears you clearly — then speak your command. Runs 100% on-device, no network, no wake word.</string>
     <string name="voice_downloading_models">Downloading voice models (~45 MB, once)…</string>
     <string name="voice_models_failed">Voice model download failed. Check connection and retry.</string>
     <string name="voice_mic_denied">Microphone access is required for hands-free mode.</string>
-    <string name="voice_started">Voice ready — press 🎤 to speak</string>
+    <string name="voice_started">Voice ready — tap pause, then speak</string>
     <string name="voice_stopped">Hands-free off</string>
     <string name="voice_assistant_title">Digital assistant</string>
     <string name="voice_assistant_desc">Route your steering-wheel / headset voice button to HeyTune instead of Google. Works on the phone; Android Auto projection still reserves its button for Google.</string>

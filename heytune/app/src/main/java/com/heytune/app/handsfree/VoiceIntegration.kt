@@ -136,10 +136,18 @@ object VoiceIntegration {
     }
 
     /**
-     * One-shot voice command (e.g. steering-wheel assistant button or the
-     * notification "Listen" action): same model prep as driving mode, then a
-     * single wake-free window. The service stops itself afterwards unless
-     * driving mode is on. Never touches the driving-mode setting.
+     * Pause-button voice trigger: tapping pause stops the music (so the mic
+     * hears no background noise) and opens one English-only listen window.
+     * Call this AFTER pausing playback. The service stops itself afterwards
+     * unless driving mode is on. Never touches the driving-mode setting.
+     */
+    fun onPausePressed(activity: MainActivity) = listenOnce(activity)
+
+    /**
+     * One-shot voice command (pause button, steering-wheel assistant button
+     * or the notification "Listen" action): same model prep as driving mode,
+     * then a single wake-free window. The service stops itself afterwards
+     * unless driving mode is on. Never touches the driving-mode setting.
      */
     fun listenOnce(activity: MainActivity) {
         activity.lifecycleScope.launch {

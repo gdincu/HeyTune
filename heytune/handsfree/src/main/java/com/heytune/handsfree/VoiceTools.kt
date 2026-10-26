@@ -23,15 +23,14 @@ object VoiceTools {
     const val EXECUTE_AT = 0.50
     const val CONFIRM_AT = 0.10 // engine floor: below -> suppressed_calls
 
-    // The wake phrase is "hey tune" (two words, word-boundary matched:
-    // bare "hey", "they", "whey" etc. must NOT trigger). Anything after it
-    // is the command; "hey tune" alone is ignored before any Needle call.
-    private val WAKE_RE = Regex("""\bhey[\s,\-]+tunes?\b""", RegexOption.IGNORE_CASE)
-    private val WAKE_LEAD_RE = Regex("""^\s*hey[\s,\-]+tunes?\b[\s,.!:-]*""", RegexOption.IGNORE_CASE)
+    /** Whistle is fixed to English: no auto-detect, no other languages. */
+    const val VOICE_LANGUAGE = "en"
 
-    fun hasWake(text: String): Boolean = WAKE_RE.containsMatchIn(text.trim())
+    /** Deprecated: no wake word anymore (pause is the trigger). Always true. */
+    fun hasWake(text: String): Boolean = true
 
-    fun stripWake(text: String): String = WAKE_LEAD_RE.replaceFirst(text.trim(), "")
+    /** Deprecated: no wake word to strip. Returns text unchanged (trimmed). */
+    fun stripWake(text: String): String = text.trim()
 
     fun route(result: VoiceResult): Pair<VoiceDecision, List<ToolCall>> {
         if (result.functionCalls.isNotEmpty() && result.confidence >= EXECUTE_AT) {
