@@ -316,6 +316,9 @@ class VoiceService : Service() {
             when (decision) {
                 VoiceDecision.EXECUTE -> {
                     bridge.dispatch(calls)
+                    if (calls.none { it.name == "pause_playback" }) {
+                        try { bridge.dispatch(listOf(ToolCall("resume_playback", emptyMap()))) } catch (_: Exception) {}
+                    }
                     notify("✔ ${calls.firstOrNull()?.name}")
                 }
                 VoiceDecision.CONFIRM -> {
@@ -324,6 +327,9 @@ class VoiceService : Service() {
                     val agreed = fb != null && calls.any { it.name == fb.name && it.arguments == fb.arguments }
                     if (agreed) {
                         bridge.dispatch(calls)
+                        if (calls.none { it.name == "pause_playback" }) {
+                            try { bridge.dispatch(listOf(ToolCall("resume_playback", emptyMap()))) } catch (_: Exception) {}
+                        }
                         notify("✔ ${calls.firstOrNull()?.name} (confirmed)")
                     } else {
                         notify("Heard '${result.audioText}' — tap to confirm")
@@ -344,6 +350,9 @@ class VoiceService : Service() {
             return
         }
         bridge.dispatch(listOf(call))
+        if (call.name != "pause_playback") {
+            try { bridge.dispatch(listOf(ToolCall("resume_playback", emptyMap()))) } catch (_: Exception) {}
+        }
         notify("✔ ${call.name} (offline)")
     }
 

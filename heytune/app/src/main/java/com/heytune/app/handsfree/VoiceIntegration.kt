@@ -281,17 +281,18 @@ object VoiceIntegration {
     ) {
         try {
             val db = playerConnection.database
-            val songs = combine(
-                db.searchSongs(query),
-                db.searchArtistSongs(query),
-            ) { songs, artistSongs ->
-                (songs + artistSongs).distinctBy { it.id }
-            }.first()
+            // Fetch separately so we can detect "play <artist>" intent
+            val songHits = db.searchSongs(query).first()
+            val artistHits = db.searchArtistSongs(query).first()
+            val songs = (songHits + artistHits).distinctBy { it.id }
             if (songs.isEmpty()) {
                 Log.i(TAG, "voice play: no local results for '$query'")
                 return
             }
-            val items = songs.map { it.toMediaMetadata() }
+            // Artist name: play random song from that artist, not always the same first one
+            val isArtistIntent = artistHits.isNotEmpty() && songHits.isEmpty()
+            val ordered = if (isArtistIntent) songs.shuffled() else songs
+            val items = ordered.map { it.toMediaMetadata() }
             withContext(Dispatchers.Main) {
                 playerConnection.playQueue(
                     ListQueue(
@@ -301,7 +302,7 @@ object VoiceIntegration {
                     ),
                 )
             }
-            Log.i(TAG, "voice play: '$query' -> ${songs.size} result(s), playing first")
+            Log.i(TAG, "voice play: '$query' -> ${songs.size} result(s) [songHits=${songHits.size} artistHits=${artistHits.size} randomArtist=$isArtistIntent], playing ${if (isArtistIntent) "random" else "first"}")
         } catch (e: Exception) {
             Log.w(TAG, "voice play failed for '$query'", e)
         }
