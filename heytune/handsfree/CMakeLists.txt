@@ -24,6 +24,16 @@ endif()
 
 add_library(needle_bridge SHARED src/main/cpp/needle_bridge.cpp)
 
+if(ANDROID)
+  # 16 KB page-size alignment: without this, Android 15+ shows a
+  # 16 KB-compatibility warning on every launch ("LOAD segment not
+  # aligned") and 16 KB-page devices refuse to load the lib at all.
+  # NDK r27's lld honours both flags.
+  target_link_options(needle_bridge PRIVATE
+    "LINKER:-z,max-page-size=16384"
+    "LINKER:-z,common-page-size=16384")
+endif()
+
 if(CACTUS_ABI)
   target_include_directories(needle_bridge PRIVATE ${NEEDLE_ENGINE_DIR}/${CACTUS_ABI})
 
