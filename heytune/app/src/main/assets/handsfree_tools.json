@@ -9,27 +9,32 @@
           "query": { "type": "string", "description": "Song/artist/album name, e.g. Bohemian Rhapsody" }
         },
         "required": ["query"]
-      }
+      },
+      "triggers": ["\\bplay\\b.*", "\\bput on\\b.*", "\\bstart\\b.*\\b(song|music|track)\\b.*"]
     },
     {
       "name": "pause_playback",
       "description": "Pause the current playback. Use for 'pause', 'pause the music'.",
-      "parameters": { "type": "object", "properties": {} }
+      "parameters": { "type": "object", "properties": {} },
+      "triggers": ["\\bpause\\b.*", "\\bstop\\b.*\\b(music|song|playback)\\b.*"]
     },
     {
       "name": "resume_playback",
       "description": "Resume paused playback. Use for 'resume', 'continue playing'.",
-      "parameters": { "type": "object", "properties": {} }
+      "parameters": { "type": "object", "properties": {} },
+      "triggers": ["\\bresume\\b.*", "\\bcontinue\\b.*", "\\bunpause\\b.*", "\\bplay\\b\\s*$"]
     },
     {
       "name": "next_track",
       "description": "Skip to the next track. Use for 'next', 'next song', 'skip'.",
-      "parameters": { "type": "object", "properties": {} }
+      "parameters": { "type": "object", "properties": {} },
+      "triggers": ["\\bnext\\b.*", "\\bskip\\b.*"]
     },
     {
       "name": "previous_track",
       "description": "Go back to the previous track. Use for 'previous', 'go back'.",
-      "parameters": { "type": "object", "properties": {} }
+      "parameters": { "type": "object", "properties": {} },
+      "triggers": ["\\bprevious\\b.*", "\\bback\\b.*", "\\blast song\\b.*"]
     },
     {
       "name": "set_volume",
@@ -38,7 +43,8 @@
         "type": "object",
         "properties": { "level": { "type": "integer", "minimum": 0, "maximum": 100 } },
         "required": ["level"]
-      }
+      },
+      "triggers": ["\\bvolume\\b.*", "\\blouder\\b.*", "\\bquieter\\b.*"]
     },
     {
       "name": "toggle_shuffle",
@@ -47,12 +53,24 @@
         "type": "object",
         "properties": { "on": { "type": "boolean" } },
         "required": ["on"]
-      }
+      },
+      "triggers": ["\\bshuffl\\w*\\b.*"]
+    },
+    {
+      "name": "set_repeat_mode",
+      "description": "Set repeat mode. mode='off' for 'repeat off'; 'all' for 'repeat all'; 'one' for 'repeat one' or 'repeat this song'.",
+      "parameters": {
+        "type": "object",
+        "properties": { "mode": { "type": "string", "enum": ["off", "all", "one"] } },
+        "required": ["mode"]
+      },
+      "triggers": ["\\brepeat\\b.*", "\\bloop\\b.*"]
     },
     {
       "name": "like_current_song",
       "description": "Like / favourite the currently playing song.",
-      "parameters": { "type": "object", "properties": {} }
+      "parameters": { "type": "object", "properties": {} },
+      "triggers": ["\\blike\\b.*", "\\badd\\b.*\\b(favorite|favourite|playlist)\\b.*"]
     }
   ]
 }

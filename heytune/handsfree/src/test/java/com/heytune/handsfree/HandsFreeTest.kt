@@ -20,6 +20,11 @@ class HandsFreeTest {
         assertEquals(mapOf("level" to 50), CommandParser.parse("volume to 50")?.arguments)
         assertEquals(mapOf("on" to true), CommandParser.parse("shuffle on")?.arguments)
         assertEquals(mapOf("on" to false), CommandParser.parse("stop shuffling")?.arguments)
+        assertEquals(mapOf("mode" to "off"), CommandParser.parse("repeat off")?.arguments)
+        assertEquals(mapOf("mode" to "all"), CommandParser.parse("repeat all")?.arguments)
+        assertEquals(mapOf("mode" to "one"), CommandParser.parse("repeat one")?.arguments)
+        assertEquals(mapOf("mode" to "one"), CommandParser.parse("repeat this song")?.arguments)
+        assertEquals("like_current_song", CommandParser.parse("like this song")?.name)
         assertNull(CommandParser.parse("hello world"))
         assertNull(CommandParser.parse(""))
     }
@@ -36,6 +41,8 @@ class HandsFreeTest {
         val player = FakePlayer()
         listOf(ToolCall("play_song", mapOf("query" to "X"))).dispatchOn(player)
         assertEquals(listOf("play:X"), player.calls)
+        listOf(ToolCall("set_repeat_mode", mapOf("mode" to "one"))).dispatchOn(player)
+        assertEquals(listOf("play:X", "repeat:one"), player.calls)
     }
 
     class FakePlayer : SimplePlayer {
@@ -47,6 +54,7 @@ class HandsFreeTest {
         override fun previous(): Any? = null
         override fun setVolume(level: Int): Any? = null
         override fun setShuffle(on: Boolean): Any? = null
+        override fun setRepeatMode(mode: String): Any? = "repeat:$mode".also { calls += it }
         override fun likeCurrent(): Any? = null
     }
 }

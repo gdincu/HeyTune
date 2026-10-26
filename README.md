@@ -61,6 +61,8 @@ Speak naturally in English. For example:
 - "go back" / "previous" — go back a track
 - "volume to 50" / "louder" / "quieter" — set the volume (0–100)
 - "shuffle on" / "shuffle off" / "stop shuffling" — control shuffle
+- "repeat off" / "repeat all" / "repeat one" (or "repeat this song") —
+  control repeat
 - "like this song" — favourite the current song
 
 Anything else is ignored with a short message saying what was heard.

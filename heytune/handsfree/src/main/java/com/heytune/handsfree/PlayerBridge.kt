@@ -3,6 +3,9 @@ package com.heytune.handsfree
 import android.os.Handler
 import android.os.Looper
 import androidx.media3.common.Player
+import androidx.media3.common.Player.REPEAT_MODE_ALL
+import androidx.media3.common.Player.REPEAT_MODE_OFF
+import androidx.media3.common.Player.REPEAT_MODE_ONE
 import androidx.media3.session.MediaController
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executor
@@ -64,6 +67,15 @@ class PlayerBridge(private val controller: MediaController) {
             controller.shuffleModeEnabled = on
             lastAction = "shuffle=$on"
         }
+        "set_repeat_mode" -> {
+            val mode = (call.arguments["mode"] as? String)?.lowercase() ?: "off"
+            controller.repeatMode = when (mode) {
+                "one" -> REPEAT_MODE_ONE
+                "all" -> REPEAT_MODE_ALL
+                else -> REPEAT_MODE_OFF
+            }
+            lastAction = "repeat=$mode"
+        }
         "like_current_song" -> {
             // HeyTune: DatabaseDao toggle like on controller.currentMediaItem.
             // Kept as a callback so the host app owns DB access.
@@ -119,6 +131,7 @@ interface SimplePlayer {
     fun previous(): Any?
     fun setVolume(level: Int): Any?
     fun setShuffle(on: Boolean): Any?
+    fun setRepeatMode(mode: String): Any?
     fun likeCurrent(): Any?
 }
 
@@ -131,6 +144,7 @@ fun List<ToolCall>.dispatchOn(player: SimplePlayer): List<Any?> = map { call ->
         "previous_track" -> player.previous()
         "set_volume" -> player.setVolume((call.arguments["level"] as? Number)?.toInt() ?: 50)
         "toggle_shuffle" -> player.setShuffle(call.arguments["on"] as? Boolean ?: true)
+        "set_repeat_mode" -> player.setRepeatMode(call.arguments["mode"] as? String ?: "off")
         "like_current_song" -> player.likeCurrent()
         else -> mapOf("error" to "unknown tool: ${call.name}")
     }

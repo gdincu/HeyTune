@@ -9,6 +9,7 @@ object CommandParser {
 
     private val volumeTo = Regex("""\bvolume(?: to| at)?\s*(?<level>\d{1,3})\b""", RegexOption.IGNORE_CASE)
     private val shuffleState = Regex("""\bshuffle\s*(?<state>on|off)\b""", RegexOption.IGNORE_CASE)
+    private val repeatState = Regex("""\brepeat\s*(?<mode>off|all|one)\b""", RegexOption.IGNORE_CASE)
     private val playQuery = Regex("""\b(?:play|put on|start)\b\s+(?<query>.+)$""", RegexOption.IGNORE_CASE)
 
     fun parse(text: String): ToolCall? {
@@ -40,7 +41,28 @@ object CommandParser {
         if (low.contains("stop shuffling") || low.contains("disable shuffle")) {
             return ToolCall("toggle_shuffle", mapOf("on" to false))
         }
-        if (low.startsWith("like") || (low.contains("add") && (low.contains("favorite") || low.contains("favourite")))) {
+        repeatState.find(t)?.let {
+            return ToolCall("set_repeat_mode", mapOf("mode" to it.groups["mode"]!!.value.lowercase()))
+        }
+        if (low.contains("repeat this song") || low.contains("repeat one song") ||
+            low.contains("loop this") || low.contains("loop one")
+        ) {
+            return ToolCall("set_repeat_mode", mapOf("mode" to "one"))
+        }
+        if (low.contains("repeat everything") || low.contains("repeat all songs") ||
+            low.contains("loop all") || low.contains("loop everything")
+        ) {
+            return ToolCall("set_repeat_mode", mapOf("mode" to "all"))
+        }
+        if (low.contains("stop repeating") || low.contains("don't repeat") ||
+            low.contains("do not repeat") || low.contains("repeat off")
+        ) {
+            return ToolCall("set_repeat_mode", mapOf("mode" to "off"))
+        }
+        if (low.startsWith("like") || low.contains("like this song") ||
+            low.contains("like the song") ||
+            (low.contains("add") && (low.contains("favorite") || low.contains("favourite")))
+        ) {
             return ToolCall("like_current_song")
         }
         playQuery.find(t)?.let {

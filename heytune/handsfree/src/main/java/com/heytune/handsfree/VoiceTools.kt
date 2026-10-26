@@ -19,7 +19,7 @@ object VoiceTools {
     // Calibrated 2026-10-25 on Needle 3 base: play 0.855, next 0.836,
     // volume 0.644, pause 0.613, shuffle 0.562, resume 0.462.
     // 0.50 executes common driving commands; rest go to confirm UI.
-    // Fine-tuning on these 8 tools is the proper fix (+18-36 pts).
+    // Fine-tuning on these tools is the proper fix (+18-36 pts).
     const val EXECUTE_AT = 0.50
     const val CONFIRM_AT = 0.10 // engine floor: below -> suppressed_calls
 
