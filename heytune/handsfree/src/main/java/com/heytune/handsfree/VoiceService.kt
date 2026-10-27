@@ -12,6 +12,7 @@ import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -55,6 +56,15 @@ class VoiceService : Service() {
         const val LISTEN_ONCE_WINDOW_MS = 20_000L
 
         /**
+         * CPU wake-lock backstop for one listen window (capture + on-device
+         * inference). Music is paused while listening, so ExoPlayer's own
+         * wake lock is released — without this the device can sleep
+         * mid-command with the screen off (Android Auto). Released in the
+         * loop's finally; the timeout only guards a missed release.
+         */
+        const val LISTEN_WAKELOCK_TIMEOUT_MS = 60_000L
+
+        /**
          * Cancels the current listen window: the mic closes, any captured
          * audio is dropped without inference, and no command executes.
          * The service itself keeps running (unless driving mode is off).
@@ -80,6 +90,9 @@ class VoiceService : Service() {
     private var worker: Thread? = null
     private var audioFocus: AudioFocusRequest? = null
 
+    /** Held only for one listen window; see LISTEN_WAKELOCK_TIMEOUT_MS. */
+    private var listenWakeLock: PowerManager.WakeLock? = null
+
     var settings = VoiceSettings()
         private set
 
@@ -88,6 +101,13 @@ class VoiceService : Service() {
     override fun onCreate() {
         super.onCreate()
         createChannel()
+        try {
+            listenWakeLock = (getSystemService(POWER_SERVICE) as PowerManager)
+                .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "HeyTune:voice-listen")
+                .apply { setReferenceCounted(false) }
+        } catch (e: Exception) {
+            Log.w(TAG, "wake lock unavailable, screen-off listen may sleep", e)
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -168,7 +188,26 @@ class VoiceService : Service() {
         }
         worker?.interrupt()
         worker = null
+        releaseListenLock()
         abandonDuck()
+    }
+
+    private fun acquireListenLock() {
+        try {
+            // Timeout acquire: auto-releases even if a code path below
+            // ever misses the matching release — no battery risk.
+            listenWakeLock?.acquire(LISTEN_WAKELOCK_TIMEOUT_MS)
+        } catch (e: Exception) {
+            Log.w(TAG, "wake lock acquire failed", e)
+        }
+    }
+
+    private fun releaseListenLock() {
+        try {
+            if (listenWakeLock?.isHeld == true) listenWakeLock?.release()
+        } catch (e: Exception) {
+            Log.w(TAG, "wake lock release failed", e)
+        }
     }
 
     override fun onDestroy() {
@@ -309,6 +348,10 @@ class VoiceService : Service() {
                 return
             }
             synchronized(lock) { listenArmed = false }
+            // CPU must stay awake for capture + inference: music is paused
+            // so ExoPlayer's wake lock is released, and with the screen off
+            // the device would otherwise sleep mid-window.
+            acquireListenLock()
             try {
                 captureOne()
             } catch (t: Throwable) {
@@ -318,6 +361,7 @@ class VoiceService : Service() {
                 // finally so future arms are never ignored forever.
                 Log.w(TAG, "capture failed, dropping window", t)
             } finally {
+                releaseListenLock()
                 synchronized(lock) { windowClaimed = false }
             }
             // Pause-only use: stop after the window unless driving mode
