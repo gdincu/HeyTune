@@ -26,6 +26,7 @@ import com.heytune.app.playback.queues.ListQueue
 import com.heytune.app.utils.dataStore
 import com.heytune.handsfree.ModelManager
 import com.heytune.handsfree.PlayerBridge
+import com.heytune.handsfree.VoiceCues
 import com.heytune.handsfree.VoiceService
 import com.heytune.handsfree.VoiceSettings
 import kotlinx.coroutines.Dispatchers
@@ -298,6 +299,14 @@ object VoiceIntegration {
             val q = com.heytune.handsfree.CommandParser.normalize(query)
             if (q.isEmpty()) {
                 Log.i(TAG, "voice play: empty query after normalize ('$query')")
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(
+                        activity,
+                        activity.getString(R.string.voice_not_heard),
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                }
+                VoiceCues.playError(activity)
                 return
             }
             val db = playerConnection.database
@@ -307,13 +316,24 @@ object VoiceIntegration {
             val songs = (songHits + artistHits).distinctBy { it.id }
             if (songs.isEmpty()) {
                 Log.i(TAG, "voice play: no local results for '$query' (normalized '$q')")
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(
+                        activity,
+                        activity.getString(R.string.voice_song_not_found, query),
+                        Toast.LENGTH_LONG,
+                    ).show()
+                }
+                VoiceCues.playError(activity)
                 return
             }
+            // Match found: OK cue first, then execute (user hears
+            // confirmation just before the new track starts).
             // Artist name: play random song from that artist, not always the same first one
             val isArtistIntent = artistHits.isNotEmpty() && songHits.isEmpty()
             val ordered = if (isArtistIntent) songs.shuffled() else songs
             val items = ordered.map { it.toMediaMetadata() }
             withContext(Dispatchers.Main) {
+                VoiceCues.playOk(activity)
                 playerConnection.playQueue(
                     ListQueue(
                         title = "Voice: $query",
@@ -325,6 +345,7 @@ object VoiceIntegration {
             Log.i(TAG, "voice play: '$query' -> ${songs.size} result(s) [songHits=${songHits.size} artistHits=${artistHits.size} randomArtist=$isArtistIntent], playing ${if (isArtistIntent) "random" else "first"}")
         } catch (e: Exception) {
             Log.w(TAG, "voice play failed for '$query'", e)
+            VoiceCues.playError(activity)
         }
     }
 
@@ -337,11 +358,20 @@ object VoiceIntegration {
             val all = withContext(Dispatchers.IO) { playerConnection.database.allLocalSongs() }
             if (all.isEmpty()) {
                 Log.i(TAG, "voice random: empty library")
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(
+                        activity,
+                        activity.getString(R.string.voice_library_empty),
+                        Toast.LENGTH_LONG,
+                    ).show()
+                }
+                VoiceCues.playError(activity)
                 return
             }
             val pick = all.random()
             val items = listOf(pick.toMediaMetadata())
             withContext(Dispatchers.Main) {
+                VoiceCues.playOk(activity)
                 playerConnection.playQueue(
                     ListQueue(
                         title = "Random",
@@ -353,6 +383,7 @@ object VoiceIntegration {
             Log.i(TAG, "voice random -> ${pick.song.title} (${all.size} total)")
         } catch (e: Exception) {
             Log.w(TAG, "voice random failed", e)
+            VoiceCues.playError(activity)
         }
     }
 }

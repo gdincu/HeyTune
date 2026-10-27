@@ -393,6 +393,7 @@ class VoiceService : Service() {
             if (text.isBlank()) {
                 Log.w(TAG, "utterance: no transcript, dropping")
                 notify("Didn't catch that — try again")
+                VoiceCues.playError(this)
                 return
             }
             Log.i(TAG, "utterance: transcribe-only '$text'")
@@ -402,7 +403,9 @@ class VoiceService : Service() {
         val command = result.audioText.trim()
         if (command.isBlank()) {
             Log.i(TAG, "utterance: blank transcript, ignoring")
-            return // nothing said
+            notify("Didn't catch that — try again")
+            VoiceCues.playError(this)
+            return
         }
         val (decision, calls) = VoiceTools.route(result)
         Log.i(TAG, "utterance: '$command' decision=$decision calls=$calls conf=${result.confidence}")
@@ -412,7 +415,13 @@ class VoiceService : Service() {
                     bridge.dispatch(calls)
                 } catch (e: Exception) {
                     Log.w(TAG, "utterance: dispatch failed", e)
+                    notify("Command failed — try again")
+                    VoiceCues.playError(this)
+                    return
                 }
+                // play_song / play_random_song cue later, from the async
+                // search result (match -> OK before playing, miss -> error).
+                if (!VoiceCues.allDeferred(calls)) VoiceCues.playOk(this)
                 if (calls.none { it.name == "pause_playback" }) {
                     try { bridge.dispatch(listOf(ToolCall("resume_playback", emptyMap()))) } catch (_: Exception) {}
                 }
@@ -427,13 +436,18 @@ class VoiceService : Service() {
                         bridge.dispatch(calls)
                     } catch (e: Exception) {
                         Log.w(TAG, "utterance: dispatch failed", e)
+                        notify("Command failed — try again")
+                        VoiceCues.playError(this)
+                        return
                     }
+                    if (!VoiceCues.allDeferred(calls)) VoiceCues.playOk(this)
                     if (calls.none { it.name == "pause_playback" }) {
                         try { bridge.dispatch(listOf(ToolCall("resume_playback", emptyMap()))) } catch (_: Exception) {}
                     }
                     notify("✔ ${calls.firstOrNull()?.name} (confirmed)")
                 } else {
                     notify("Heard '${result.audioText}' — tap to confirm")
+                    VoiceCues.playError(this)
                 }
             }
             VoiceDecision.REFUSE -> fallback(result.audioText, bridge)
@@ -445,14 +459,18 @@ class VoiceService : Service() {
         val call = CommandParser.parse(text) ?: run {
             Log.i(TAG, "fallback: no matching command for '$text'")
             notify("Heard '$text' — no matching command")
+            VoiceCues.playError(this)
             return
         }
         try {
             bridge.dispatch(listOf(call))
         } catch (e: Exception) {
             Log.w(TAG, "fallback: dispatch failed", e)
+            notify("Command failed — try again")
+            VoiceCues.playError(this)
             return
         }
+        if (!VoiceCues.allDeferred(listOf(call))) VoiceCues.playOk(this)
         if (call.name != "pause_playback") {
             try { bridge.dispatch(listOf(ToolCall("resume_playback", emptyMap()))) } catch (_: Exception) {}
         }

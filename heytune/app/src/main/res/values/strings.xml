@@ -291,6 +291,9 @@ We recycle translations from upstream, they are pulled periodically. -->
     <string name="voice_mic_denied">Microphone access is required for hands-free mode.</string>
     <string name="voice_started">Voice ready — tap pause, then speak</string>
     <string name="voice_stopped">Hands-free off</string>
+    <string name="voice_song_not_found">No songs found for “%1$s” — try again</string>
+    <string name="voice_library_empty">Music library is empty — nothing to play</string>
+    <string name="voice_not_heard">Didn’t catch that — try again</string>
     <string name="equalizer">Equalizer</string>
 
     <string name="storage">Storage</string>

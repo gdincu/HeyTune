@@ -2,7 +2,9 @@ package com.heytune.handsfree
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /** Voice-pipeline checks. Run in Android Studio (needs SDK). */
 class HandsFreeTest {
@@ -35,6 +37,18 @@ class HandsFreeTest {
         val confirm = VoiceResult(listOf(ToolCall("pause_playback")), confidence = 0.43)
         assertEquals(VoiceDecision.CONFIRM, VoiceTools.route(confirm).first)
         assertEquals(VoiceDecision.REFUSE, VoiceTools.route(VoiceResult()).first)
+    }
+
+    @Test fun cueDeferral() {
+        // play_song / play_random_song resolve async in the host app: the
+        // service must not beep OK at dispatch time, the search result beeps.
+        assertTrue(VoiceCues.isDeferred("play_song"))
+        assertTrue(VoiceCues.isDeferred("play_random_song"))
+        assertFalse(VoiceCues.isDeferred("pause_playback"))
+        assertFalse(VoiceCues.isDeferred("next_track"))
+        assertTrue(VoiceCues.allDeferred(listOf(ToolCall("play_song", mapOf("query" to "X")))))
+        assertFalse(VoiceCues.allDeferred(listOf(ToolCall("pause_playback"))))
+        assertFalse(VoiceCues.allDeferred(emptyList()))
     }
 
     @Test fun dispatch() {

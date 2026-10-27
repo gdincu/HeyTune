@@ -46,6 +46,10 @@ No Play Store, no account, no sign-in.
 3. The app carries it out. If it wasn't sure what you said, it tells you
    what it heard instead of guessing.
 
+   Sounds: a short ascending chime means a match was found (it plays just
+   before the action runs); a low double-tone means nothing matched or the
+   song/artist wasn't in your library — just tap pause and retry.
+
 Tap pause to talk, every time. Pausing first is the whole trick: no
 background music means the app understands you much better, and there is
 never a microphone listening in the background.
@@ -65,7 +69,7 @@ Speak naturally in English. All commands are defined in `heytune/app/src/main/as
 - **"repeat off" / "don't repeat" / "repeat all" / "loop all" / "repeat one" / "repeat this song" / "loop this"** — control repeat (`set_repeat_mode` with `mode: off/all/one`)
 - **"like this song" / "like the song" / "add to favorite/favourite"** — favourite the current song (`like_current_song`)
 
-Anything else is ignored with a short message saying what was heard (“Heard ‘…’ — no matching command”).
+Anything else is ignored with a short message saying what was heard (“Heard ‘…’ — no matching command”) plus the error tone so you know to retry. A song or artist that isn’t in your library likewise plays the error tone and says what wasn’t found.
 
 ## Your privacy
 
