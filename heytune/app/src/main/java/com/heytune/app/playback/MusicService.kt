@@ -803,15 +803,22 @@ class MusicService : MediaLibraryService(),
             // Those must NOT arm STT, otherwise the mic opens briefly on
             // every transition and closes again on PLAYING (brief STT icon).
             // Only a real pause (playWhenReady=false) arms a window.
-            // Also skip when a voice command just fired (e.g. voice
-            // pause/next/play) so voice-driven transitions never re-arm.
+            // Also skip shortly after a voice pause_playback so a
+            // voice-driven pause doesn't immediately re-arm. Other voice
+            // actions (play/next/volume/...) must NOT suppress: the user may
+            // pause again seconds later to issue the next command.
             if (!player.playWhenReady && player.playbackState != Player.STATE_ENDED) {
                 val bridge = VoiceService.playerBridge
-                val voiceActiveRecently = bridge?.lastAction != null &&
+                val voicePausedRecently = bridge?.lastAction == "pause" &&
                     (android.os.SystemClock.elapsedRealtime() - bridge.lastActionTimeMs < 5_000L)
-                if (!voiceActiveRecently && !VoiceService.isListening.value) {
+                if (voicePausedRecently) {
+                    Log.i(TAG, "pause: skip STT arm (voice pause <5s ago)")
+                } else if (VoiceService.isListening.value) {
+                    Log.i(TAG, "pause: skip STT arm (already listening)")
+                } else {
                     if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
                         try {
+                            Log.i(TAG, "pause: arming STT window")
                             val intent = Intent(this, VoiceService::class.java).setAction(VoiceService.ACTION_LISTEN_ONCE)
                             // Use startService and let VoiceService promote itself.
                             // startForegroundService here triggers FGS timeout if VoiceService
@@ -820,8 +827,12 @@ class MusicService : MediaLibraryService(),
                         } catch (_: Exception) {
                             Log.w(TAG, "remote pause voice arm failed")
                         }
+                    } else {
+                        Log.i(TAG, "pause: skip STT arm (no mic permission)")
                     }
                 }
+            } else if (!isPlaying) {
+                Log.i(TAG, "isPlaying=false ignored for STT (playWhenReady=${player.playWhenReady} state=${player.playbackState})")
             }
         } else {
             // Resumed (play button / Auto play) while mic is open -> cancel window, like in-app play tap

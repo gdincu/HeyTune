@@ -155,6 +155,7 @@ object VoiceIntegration {
      * Safe to call when nothing is listening — it is a no-op then.
      */
     fun cancelListen(activity: MainActivity) {
+        Log.i(TAG, "cancelListen")
         activity.startService(
             Intent(activity, VoiceService::class.java)
                 .setAction(VoiceService.ACTION_CANCEL_WINDOW),
@@ -168,17 +169,22 @@ object VoiceIntegration {
      * Never touches the driving-mode setting.
      */
     fun listenOnce(activity: MainActivity) {
+        Log.i(TAG, "listenOnce")
         activity.lifecycleScope.launch {
             if (!hasMicPermission(activity)) {
+                Log.i(TAG, "listenOnce: requesting mic permission")
                 pendingListenOnce = true
                 micPermissionLauncher?.launch(Manifest.permission.RECORD_AUDIO)
                 return@launch
             }
             if (prepareModels(activity)) {
+                Log.i(TAG, "listenOnce: models ready, arming")
                 activity.startService(
                     Intent(activity, VoiceService::class.java)
                         .setAction(VoiceService.ACTION_LISTEN_ONCE),
                 )
+            } else {
+                Log.w(TAG, "listenOnce: model prep failed")
             }
         }
     }

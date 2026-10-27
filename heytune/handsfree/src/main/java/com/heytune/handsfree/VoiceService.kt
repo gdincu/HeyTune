@@ -13,6 +13,7 @@ import android.media.MediaRecorder
 import android.os.Build
 import android.os.IBinder
 import android.os.SystemClock
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -71,6 +72,8 @@ class VoiceService : Service() {
          */
         private val _isListening = MutableStateFlow(false)
         val isListening: StateFlow<Boolean> = _isListening
+
+        private const val TAG = "HeyTuneVoice"
     }
 
     private var running = false
@@ -105,13 +108,16 @@ class VoiceService : Service() {
                     startForeground(NOTIF_ID, notification("Listening… speak now 🎤"))
                 }
                 if (!ModelManager.modelsReady(this)) {
+                    Log.w(TAG, "LISTEN_ONCE: models not ready")
                     notify("Voice models not ready — enable driving mode once to download")
                     if (needsFg) stopSelf()
                     return START_NOT_STICKY
                 }
+                Log.i(TAG, "LISTEN_ONCE: arming window (running=$running)")
                 armWindow()
                 if (!running) {
                     if (!NeedleBridge.nativeAvailable) {
+                        Log.w(TAG, "LISTEN_ONCE: native engine unavailable")
                         notify("Voice engine unavailable on this device/ABI")
                         stopSelf()
                         return START_NOT_STICKY
@@ -119,11 +125,12 @@ class VoiceService : Service() {
                     // Already foregrounded above; just start the worker
                     startVoice()
                 } else {
-                    notify("Listening… speak now 🎤")
+                    Log.i(TAG, "LISTEN_ONCE: re-armed while running")
                 }
                 return START_STICKY
             }
             ACTION_CANCEL_WINDOW -> {
+                Log.i(TAG, "CANCEL_WINDOW")
                 cancelWindow()
                 if (!running) stopSelf()
                 return START_STICKY
@@ -298,66 +305,112 @@ class VoiceService : Service() {
         val cancelled = cancelRequested
         cancelRequested = false
         if (cancelled) {
+            Log.i(TAG, "capture: window cancelled, dropping ${window.size} samples")
             window.clear()
             return
         }
         val pcm = window.toShortArray()
+        Log.i(TAG, "capture: done samples=${pcm.size} speechSeen=$speechSeen running=$running")
         // Short commands ("pause") run well under a second; only drop blips.
-        if (pcm.size > sampleRate / 3 && running) handleUtterance(pcm)
+        if (pcm.size > sampleRate / 3 && running) {
+            handleUtterance(pcm)
+        } else {
+            Log.i(TAG, "capture: dropped (too short or stopped)")
+        }
     }
 
     private fun handleUtterance(pcm: ShortArray) {
         val samples = WakeWordDetector.toFloatMono(pcm)
-        val bridge = playerBridge ?: return
+        val bridge = playerBridge ?: run {
+            Log.w(TAG, "utterance: no playerBridge, dropping ${pcm.size} samples")
+            return
+        }
 
         // Pause-triggered window: no wake gate at all — the whole transcript
         // is the command. Whistle is English-only (VoiceTools.VOICE_LANGUAGE).
         // 1) Engine path: audio -> tool calls in one call.
         val result = try {
             NeedleBridge.completeAudio(samples, VoiceTools.VOICE_LANGUAGE)
-        } catch (_: Exception) { null }
+        } catch (e: Exception) {
+            Log.w(TAG, "utterance: completeAudio threw", e)
+            null
+        }
 
-        if (result != null) {
-            val command = result.audioText.trim()
-            if (command.isBlank()) return // nothing said
-            val (decision, calls) = VoiceTools.route(result)
-            when (decision) {
-                VoiceDecision.EXECUTE -> {
+        if (result == null) {
+            // 2) No engine result: try transcribe-only, then regex fallback.
+            // (Previously this path returned silently — the most common
+            // "STT does nothing" report.)
+            Log.w(TAG, "utterance: completeAudio returned null, trying transcribe")
+            val t = try {
+                NeedleBridge.transcribe(samples, VoiceTools.VOICE_LANGUAGE)
+            } catch (e: Exception) {
+                Log.w(TAG, "utterance: transcribe threw", e)
+                null
+            }
+            val text = t?.audioText?.trim().orEmpty()
+            if (text.isBlank()) {
+                Log.w(TAG, "utterance: no transcript, dropping")
+                notify("Didn't catch that — try again")
+                return
+            }
+            Log.i(TAG, "utterance: transcribe-only '$text'")
+            fallback(text, bridge)
+            return
+        }
+        val command = result.audioText.trim()
+        if (command.isBlank()) {
+            Log.i(TAG, "utterance: blank transcript, ignoring")
+            return // nothing said
+        }
+        val (decision, calls) = VoiceTools.route(result)
+        Log.i(TAG, "utterance: '$command' decision=$decision calls=$calls conf=${result.confidence}")
+        when (decision) {
+            VoiceDecision.EXECUTE -> {
+                try {
                     bridge.dispatch(calls)
+                } catch (e: Exception) {
+                    Log.w(TAG, "utterance: dispatch failed", e)
+                }
+                if (calls.none { it.name == "pause_playback" }) {
+                    try { bridge.dispatch(listOf(ToolCall("resume_playback", emptyMap()))) } catch (_: Exception) {}
+                }
+                notify("✔ ${calls.firstOrNull()?.name}")
+            }
+            VoiceDecision.CONFIRM -> {
+                // Agreement upgrade: deterministic fallback agrees -> just do it.
+                val fb = CommandParser.parse(command)
+                val agreed = fb != null && calls.any { it.name == fb.name && it.arguments == fb.arguments }
+                if (agreed) {
+                    try {
+                        bridge.dispatch(calls)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "utterance: dispatch failed", e)
+                    }
                     if (calls.none { it.name == "pause_playback" }) {
                         try { bridge.dispatch(listOf(ToolCall("resume_playback", emptyMap()))) } catch (_: Exception) {}
                     }
-                    notify("✔ ${calls.firstOrNull()?.name}")
+                    notify("✔ ${calls.firstOrNull()?.name} (confirmed)")
+                } else {
+                    notify("Heard '${result.audioText}' — tap to confirm")
                 }
-                VoiceDecision.CONFIRM -> {
-                    // Agreement upgrade: deterministic fallback agrees -> just do it.
-                    val fb = CommandParser.parse(command)
-                    val agreed = fb != null && calls.any { it.name == fb.name && it.arguments == fb.arguments }
-                    if (agreed) {
-                        bridge.dispatch(calls)
-                        if (calls.none { it.name == "pause_playback" }) {
-                            try { bridge.dispatch(listOf(ToolCall("resume_playback", emptyMap()))) } catch (_: Exception) {}
-                        }
-                        notify("✔ ${calls.firstOrNull()?.name} (confirmed)")
-                    } else {
-                        notify("Heard '${result.audioText}' — tap to confirm")
-                    }
-                }
-                VoiceDecision.REFUSE -> fallback(result.audioText, bridge)
             }
-            return
+            VoiceDecision.REFUSE -> fallback(result.audioText, bridge)
         }
-        // 2) No engine result: transcribe-only then fallback parse.
-        val text = result?.audioText ?: return
-        fallback(text, bridge)
     }
 
     private fun fallback(text: String, bridge: PlayerBridge) {
+        Log.i(TAG, "fallback: '$text'")
         val call = CommandParser.parse(text) ?: run {
+            Log.i(TAG, "fallback: no matching command for '$text'")
             notify("Heard '$text' — no matching command")
             return
         }
-        bridge.dispatch(listOf(call))
+        try {
+            bridge.dispatch(listOf(call))
+        } catch (e: Exception) {
+            Log.w(TAG, "fallback: dispatch failed", e)
+            return
+        }
         if (call.name != "pause_playback") {
             try { bridge.dispatch(listOf(ToolCall("resume_playback", emptyMap()))) } catch (_: Exception) {}
         }
