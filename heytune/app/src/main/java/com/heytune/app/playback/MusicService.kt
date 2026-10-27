@@ -796,10 +796,20 @@ class MusicService : MediaLibraryService(),
             val q = queueBoard.value.getCurrentQueue()
             q?.lastSongPos = pos
             // Remote pause (notification / Android Auto / headset) -> arm STT
-            // Mirrors in-app pause-to-talk. Skip if voice just issued pause_playback.
-            if (player.playbackState != Player.STATE_ENDED) {
-                val last = VoiceService.playerBridge?.lastAction
-                if (last != "pause" && !VoiceService.isListening.value) {
+            // Mirrors in-app pause-to-talk.
+            //
+            // Guard: track changes (next/prev/auto-advance, voice play_song)
+            // report isPlaying=false while BUFFERING with playWhenReady=true.
+            // Those must NOT arm STT, otherwise the mic opens briefly on
+            // every transition and closes again on PLAYING (brief STT icon).
+            // Only a real pause (playWhenReady=false) arms a window.
+            // Also skip when a voice command just fired (e.g. voice
+            // pause/next/play) so voice-driven transitions never re-arm.
+            if (!player.playWhenReady && player.playbackState != Player.STATE_ENDED) {
+                val bridge = VoiceService.playerBridge
+                val voiceActiveRecently = bridge?.lastAction != null &&
+                    (android.os.SystemClock.elapsedRealtime() - bridge.lastActionTimeMs < 5_000L)
+                if (!voiceActiveRecently && !VoiceService.isListening.value) {
                     if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
                         try {
                             val intent = Intent(this, VoiceService::class.java).setAction(VoiceService.ACTION_LISTEN_ONCE)

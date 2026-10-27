@@ -2,6 +2,7 @@ package com.heytune.handsfree
 
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import androidx.media3.common.Player
 import androidx.media3.common.Player.REPEAT_MODE_ALL
 import androidx.media3.common.Player.REPEAT_MODE_OFF
@@ -51,56 +52,60 @@ class PlayerBridge(private val controller: MediaController) {
         return result
     }
 
-    fun dispatchOne(call: ToolCall): Any? = when (call.name) {
-        "pause_playback" -> controller.pause().also { lastAction = "pause" }
-        "resume_playback" -> controller.play().also { lastAction = "resume" }
-        "next_track" -> controller.seekToNext().also { lastAction = "next" }
-        "previous_track" -> controller.seekToPrevious().also { lastAction = "previous" }
-        "set_volume" -> {
-            val level = (call.arguments["level"] as? Number)?.toInt()?.coerceIn(0, 100) ?: 50
-            // Media3 volume is 0..1 on the device stream used by MusicService.
-            controller.volume = level / 100f
-            lastAction = "volume=$level"
-        }
-        "toggle_shuffle" -> {
-            val on = call.arguments["on"] as? Boolean ?: true
-            controller.shuffleModeEnabled = on
-            lastAction = "shuffle=$on"
-        }
-        "set_repeat_mode" -> {
-            val mode = (call.arguments["mode"] as? String)?.lowercase() ?: "off"
-            controller.repeatMode = when (mode) {
-                "one" -> REPEAT_MODE_ONE
-                "all" -> REPEAT_MODE_ALL
-                else -> REPEAT_MODE_OFF
+    fun dispatchOne(call: ToolCall): Any? {
+        val result: Any? = when (call.name) {
+            "pause_playback" -> controller.pause().also { lastAction = "pause" }
+            "resume_playback" -> controller.play().also { lastAction = "resume" }
+            "next_track" -> controller.seekToNext().also { lastAction = "next" }
+            "previous_track" -> controller.seekToPrevious().also { lastAction = "previous" }
+            "set_volume" -> {
+                val level = (call.arguments["level"] as? Number)?.toInt()?.coerceIn(0, 100) ?: 50
+                // Media3 volume is 0..1 on the device stream used by MusicService.
+                controller.volume = level / 100f
+                lastAction = "volume=$level"
             }
-            lastAction = "repeat=$mode"
-        }
-        "like_current_song" -> {
-            // HeyTune: DatabaseDao toggle like on controller.currentMediaItem.
-            // Kept as a callback so the host app owns DB access.
-            onLikeRequest?.invoke(controller.currentMediaItem?.mediaId)
-            lastAction = "like"
-        }
-        "play_random_song" -> {
-            val handled = onRandomPlayRequest?.invoke() ?: false
-            lastAction = if (handled) "random" else "random(unhandled)"
-            handled
-        }
-        "play_song" -> {
-            val query = call.arguments["query"] as? String ?: ""
-            val handled = onPlaySearchRequest?.invoke(query) ?: false
-            if (!handled) {
-                // Fallback: best-effort library search via MediaController.
-                // Host app should override onPlaySearchRequest for YTM search.
-                lastAction = "play(unhandled)=$query"
-                false
-            } else {
-                lastAction = "play=$query"
-                true
+            "toggle_shuffle" -> {
+                val on = call.arguments["on"] as? Boolean ?: true
+                controller.shuffleModeEnabled = on
+                lastAction = "shuffle=$on"
             }
+            "set_repeat_mode" -> {
+                val mode = (call.arguments["mode"] as? String)?.lowercase() ?: "off"
+                controller.repeatMode = when (mode) {
+                    "one" -> REPEAT_MODE_ONE
+                    "all" -> REPEAT_MODE_ALL
+                    else -> REPEAT_MODE_OFF
+                }
+                lastAction = "repeat=$mode"
+            }
+            "like_current_song" -> {
+                // HeyTune: DatabaseDao toggle like on controller.currentMediaItem.
+                // Kept as a callback so the host app owns DB access.
+                onLikeRequest?.invoke(controller.currentMediaItem?.mediaId)
+                lastAction = "like"
+            }
+            "play_random_song" -> {
+                val handled = onRandomPlayRequest?.invoke() ?: false
+                lastAction = if (handled) "random" else "random(unhandled)"
+                handled
+            }
+            "play_song" -> {
+                val query = call.arguments["query"] as? String ?: ""
+                val handled = onPlaySearchRequest?.invoke(query) ?: false
+                if (!handled) {
+                    // Fallback: best-effort library search via MediaController.
+                    // Host app should override onPlaySearchRequest for YTM search.
+                    lastAction = "play(unhandled)=$query"
+                    false
+                } else {
+                    lastAction = "play=$query"
+                    true
+                }
+            }
+            else -> error("unknown tool: ${call.name}")
         }
-        else -> error("unknown tool: ${call.name}")
+        lastActionTimeMs = SystemClock.elapsedRealtime()
+        return result
     }
 
     /** Host hook: (query) -> true if enqueued+playing. Defaults to false. */
@@ -113,6 +118,10 @@ class PlayerBridge(private val controller: MediaController) {
     var onLikeRequest: ((String?) -> Unit)? = null
 
     var lastAction: String? = null
+        private set
+
+    /** Elapsed-realtime ms of the last dispatch; used to expire voice suppression. */
+    var lastActionTimeMs: Long = 0L
         private set
 
     companion object {
