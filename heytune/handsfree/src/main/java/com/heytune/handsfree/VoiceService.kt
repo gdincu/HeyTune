@@ -114,6 +114,9 @@ class VoiceService : Service() {
                     return START_NOT_STICKY
                 }
                 Log.i(TAG, "LISTEN_ONCE: arming window (running=$running)")
+                // Self-heal before arming: a dead worker leaves a stale
+                // claim that would ignore this (and every later) arm.
+                if (running) ensureWorker()
                 armWindow()
                 if (!running) {
                     if (!NeedleBridge.nativeAvailable) {
@@ -152,7 +155,7 @@ class VoiceService : Service() {
             return
         }
         running = true
-        worker = Thread(::loop, "handsfree-voice").apply { isDaemon = true; start() }
+        worker = newWorker()
     }
 
     private fun stopVoice() {
@@ -232,12 +235,17 @@ class VoiceService : Service() {
 
     /**
      * Cancels the current window (user tapped play): disarm so no new
-     * capture starts, and interrupt the in-flight capture so the mic
-     * closes promptly. The service itself keeps running.
+     * capture starts, and flag the in-flight capture so the mic closes
+     * promptly (within one audio frame). The service itself keeps running.
      *
      * While a capture is in flight [windowClaimed] stays set so an arm
      * landing mid-teardown can't start a window on stale audio; the loop
      * clears the claim when the capture fully ends.
+     *
+     * NOTE: never interrupts the worker here. Interrupting while parked in
+     * lock.wait() used to kill the worker thread with running=true, after
+     * which every future arm was ignored forever. notifyAll() wakes the
+     * parked thread; cancelRequested stops an in-flight capture.
      */
     private fun cancelWindow() {
         cancelRequested = true
@@ -246,7 +254,35 @@ class VoiceService : Service() {
             if (!_isListening.value) windowClaimed = false
             lock.notifyAll()
         }
-        worker?.interrupt()
+    }
+
+    /**
+     * Self-heal: if the worker thread died while [running] stayed true
+     * (e.g. an older build's cancel interrupt, or a native crash contained
+     * below the loop), stale flags would ignore every future arm forever.
+     * Detect that, reset the flags, and restart so the next pause works.
+     * Called on the LISTEN_ONCE path before arming.
+     */
+    private fun ensureWorker() {
+        val w = worker
+        if (w != null && w.isAlive) return
+        Log.w(TAG, "ensureWorker: worker dead while running — restarting")
+        synchronized(lock) {
+            listenArmed = false
+            windowClaimed = false
+            cancelRequested = false
+            lock.notifyAll()
+        }
+        _isListening.value = false
+        worker = newWorker()
+    }
+
+    private fun newWorker(): Thread = Thread(::loop, "handsfree-voice").apply {
+        isDaemon = true
+        uncaughtExceptionHandler = Thread.UncaughtExceptionHandler { t, e ->
+            Log.w(TAG, "voice worker died on $t", e)
+        }
+        start()
     }
 
     private fun loop() {
@@ -257,17 +293,33 @@ class VoiceService : Service() {
                     while (running && !listenArmed) lock.wait()
                 }
             } catch (_: InterruptedException) {
-                Thread.currentThread().interrupt()
-                synchronized(lock) { windowClaimed = false }
-                return
+                // A cancel/stop nudge, never a reason to die: re-check state
+                // and keep waiting unless the service itself is stopping.
+                // (Returning here with running=true used to kill the worker
+                // for good: every later arm was then ignored with a stale
+                // claim set — STT "stops working altogether".)
+                if (!running) {
+                    synchronized(lock) { windowClaimed = false }
+                    return
+                }
+                continue
             }
             if (!running || Thread.interrupted()) {
                 synchronized(lock) { windowClaimed = false }
                 return
             }
             synchronized(lock) { listenArmed = false }
-            captureOne()
-            synchronized(lock) { windowClaimed = false }
+            try {
+                captureOne()
+            } catch (t: Throwable) {
+                // One bad window (mic error, duck failure, inference throw,
+                // ...) must never kill the worker: drop it and stay alive
+                // for the next pause press. The claim is always cleared in
+                // finally so future arms are never ignored forever.
+                Log.w(TAG, "capture failed, dropping window", t)
+            } finally {
+                synchronized(lock) { windowClaimed = false }
+            }
             // Pause-only use: stop after the window unless driving mode
             // keeps the service alive for the next pause press.
             if (!settings.enabled) {
