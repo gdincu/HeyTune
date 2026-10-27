@@ -159,7 +159,10 @@ class VoiceService : Service() {
         running = false
         _isListening.value = false
         listenArmed = false
-        synchronized(lock) { lock.notifyAll() }
+        synchronized(lock) {
+            windowClaimed = false
+            lock.notifyAll()
+        }
         worker?.interrupt()
         worker = null
         abandonDuck()
@@ -191,6 +194,17 @@ class VoiceService : Service() {
     private var cancelRequested = false
 
     /**
+     * Synchronous "window in flight" claim. Unlike [_isListening] (set only
+     * after AudioRecord starts, ~50-100ms later), this is set inside
+     * [armWindow]'s synchronized block, closing the race where two
+     * LISTEN_ONCE intents ~18ms apart both pass the dedupe checks and the
+     * second queues a spare window. Cleared when the capture fully ends
+     * (see [loop]), on [cancelWindow] while parked, and on [stopVoice].
+     */
+    @Volatile
+    private var windowClaimed = false
+
+    /**
      * Arms one pause-triggered window; wakes the parked loop thread.
      *
      * Deduplicates: one pause press fans out to TWO LISTEN_ONCE intents
@@ -199,19 +213,17 @@ class VoiceService : Service() {
      * a spare window that opens the mic AFTER the first window's command
      * already resumed playback / changed the track — the "STT icon flashes
      * during playback / when the next song starts" bug. While the mic is
-     * open or a window is already queued, further arms are ignored.
+     * open, a window is queued, or one is being torn down, further arms
+     * are ignored.
      */
     private fun armWindow() {
         synchronized(lock) {
-            if (_isListening.value) {
-                Log.i(TAG, "armWindow: ignored (already listening)")
-                return
-            }
-            if (listenArmed) {
-                Log.i(TAG, "armWindow: ignored (already armed)")
+            if (_isListening.value || listenArmed || windowClaimed) {
+                Log.i(TAG, "armWindow: ignored (listening=${_isListening.value} armed=$listenArmed claimed=$windowClaimed)")
                 return
             }
             listenArmed = true
+            windowClaimed = true
             cancelRequested = false
             armTime = SystemClock.elapsedRealtime()
             lock.notifyAll()
@@ -222,11 +234,18 @@ class VoiceService : Service() {
      * Cancels the current window (user tapped play): disarm so no new
      * capture starts, and interrupt the in-flight capture so the mic
      * closes promptly. The service itself keeps running.
+     *
+     * While a capture is in flight [windowClaimed] stays set so an arm
+     * landing mid-teardown can't start a window on stale audio; the loop
+     * clears the claim when the capture fully ends.
      */
     private fun cancelWindow() {
         cancelRequested = true
         listenArmed = false
-        synchronized(lock) { lock.notifyAll() }
+        synchronized(lock) {
+            if (!_isListening.value) windowClaimed = false
+            lock.notifyAll()
+        }
         worker?.interrupt()
     }
 
@@ -239,11 +258,16 @@ class VoiceService : Service() {
                 }
             } catch (_: InterruptedException) {
                 Thread.currentThread().interrupt()
+                synchronized(lock) { windowClaimed = false }
                 return
             }
-            if (!running || Thread.interrupted()) return
-            listenArmed = false
+            if (!running || Thread.interrupted()) {
+                synchronized(lock) { windowClaimed = false }
+                return
+            }
+            synchronized(lock) { listenArmed = false }
             captureOne()
+            synchronized(lock) { windowClaimed = false }
             // Pause-only use: stop after the window unless driving mode
             // keeps the service alive for the next pause press.
             if (!settings.enabled) {

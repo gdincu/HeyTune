@@ -292,13 +292,21 @@ object VoiceIntegration {
         query: String,
     ) {
         try {
+            // Engine/fallback queries may carry STT punctuation ("Play, let
+            // it be."). Room LIKE is literal, so normalize before searching
+            // (same normalization as CommandParser.parse).
+            val q = com.heytune.handsfree.CommandParser.normalize(query)
+            if (q.isEmpty()) {
+                Log.i(TAG, "voice play: empty query after normalize ('$query')")
+                return
+            }
             val db = playerConnection.database
             // Fetch separately so we can detect "play <artist>" intent
-            val songHits = db.searchSongs(query).first()
-            val artistHits = db.searchArtistSongs(query).first()
+            val songHits = db.searchSongs(q).first()
+            val artistHits = db.searchArtistSongs(q).first()
             val songs = (songHits + artistHits).distinctBy { it.id }
             if (songs.isEmpty()) {
-                Log.i(TAG, "voice play: no local results for '$query'")
+                Log.i(TAG, "voice play: no local results for '$query' (normalized '$q')")
                 return
             }
             // Artist name: play random song from that artist, not always the same first one

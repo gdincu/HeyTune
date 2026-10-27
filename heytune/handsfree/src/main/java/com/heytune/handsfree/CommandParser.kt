@@ -12,8 +12,20 @@ object CommandParser {
     private val repeatState = Regex("""\brepeat\s*(?<mode>off|all|one)\b""", RegexOption.IGNORE_CASE)
     private val playQuery = Regex("""\b(?:play|put on|start)\b\s+(?<query>.+)$""", RegexOption.IGNORE_CASE)
 
+    /**
+     * Normalizes a transcript for matching: drops punctuation that STT
+     * appends (",", ".", "!", "?", ";", ":") and collapses whitespace.
+     * Apostrophes are kept so "don't repeat" still matches. Without this,
+     * "Play, let it be." never matches the play rule (it requires
+     * whitespace right after "play") and the "," poisons the DB query.
+     */
+    fun normalize(text: String): String =
+        text.replace(Regex("[,.!?;:\\-_()\\[\\]]"), " ")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+
     fun parse(text: String): ToolCall? {
-        val t = text.trim()
+        val t = normalize(text)
         if (t.isEmpty()) return null
         val low = t.lowercase()
 
