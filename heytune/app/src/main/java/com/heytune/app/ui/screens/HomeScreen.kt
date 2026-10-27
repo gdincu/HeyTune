@@ -92,6 +92,9 @@ import com.heytune.app.ui.utils.SnapLayoutInfoProvider
 import com.heytune.app.viewmodels.HomeViewModel
 import kotlin.math.min
 import kotlin.math.roundToInt
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @SuppressLint("UnusedBoxWithConstraintsScope")
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
@@ -118,6 +121,7 @@ fun HomeScreen(
 
     val isLoading by viewModel.isLoading.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
+    val shuffleQueueTitle = stringResource(R.string.shuffle)
     val pullRefreshState = rememberPullToRefreshState()
 
     val quickPicksLazyGridState = rememberLazyGridState()
@@ -494,7 +498,19 @@ fun HomeScreen(
             lazyListState = lazylistState,
             icon = Icons.Rounded.Casino,
             onClick = {
-                // TODO: local library radio
+                // Dice: play one random song from the whole local library.
+                // (Previously a no-op TODO left over from stripping radio.)
+                scope.launch {
+                    val pick = withContext(Dispatchers.IO) {
+                        database.allLocalSongs().randomOrNull()
+                    } ?: return@launch
+                    playerConnection.playQueue(
+                        ListQueue(
+                            title = shuffleQueueTitle,
+                            items = listOf(pick.toMediaMetadata()),
+                        )
+                    )
+                }
             }
         )
 

@@ -89,16 +89,32 @@ class CoilBitmapLoader @Inject constructor(
         }
 
     override suspend fun fetch(): FetchResult? {
+        // Draw missing-art placeholders at the requested size, not the
+        // 2000px default: a full 2000x2000 ARGB bitmap is 16 MB, and
+        // allocating one per art-less row while scrolling caused GC storms.
+        val targetX = data.x.takeIf { it > 0 } ?: 256
+        val targetY = data.y.takeIf { it > 0 } ?: 256
         return try {
             if (data.path?.startsWith("/storage/") == true) {
                 val mData = MediaMetadataRetriever()
                 var image: Bitmap = try {
-                    mData.setDataSource(data.path)
-                    val art = mData.embeddedPicture
-                    BitmapFactory.decodeByteArray(art, 0, art!!.size)
+                    try {
+                        mData.setDataSource(data.path)
+                        mData.embeddedPicture?.let { art ->
+                            BitmapFactory.decodeByteArray(art, 0, art.size)
+                        }
+                    } finally {
+                        // Never leak the native retriever (fds + native
+                        // memory): every row scrolling by opened one.
+                        // This leak was the main scroll slowdown.
+                        try {
+                            mData.release()
+                        } catch (_: Exception) {
+                        }
+                    }
                 } catch (e: Exception) {
-                    drawPlaceholder(context)
-                } ?: drawPlaceholder(context)
+                    null
+                } ?: drawPlaceholder(context, targetX, targetY)
 
                 if (data.x + data.y > 0) {
                     var realX = data.x
@@ -119,7 +135,9 @@ class CoilBitmapLoader @Inject constructor(
                         realY = (imgH * scale).toInt()
                     }
 
-                    image = image.scale(realX, realY)
+                    if (image.width != realX || image.height != realY) {
+                        image = image.scale(realX, realY)
+                    }
                 }
 
                 ImageFetchResult(
@@ -133,7 +151,7 @@ class CoilBitmapLoader @Inject constructor(
         } catch (e: Exception) {
             reportException(e)
             ImageFetchResult(
-                image = drawPlaceholder(context).asImage(),
+                image = drawPlaceholder(context, targetX, targetY).asImage(),
                 isSampled = false,
                 dataSource = DataSource.MEMORY
             )
