@@ -101,7 +101,27 @@ class CoilBitmapLoader @Inject constructor(
                     try {
                         mData.setDataSource(data.path)
                         mData.embeddedPicture?.let { art ->
-                            BitmapFactory.decodeByteArray(art, 0, art.size)
+                            // Downsample at decode time: a ~1400px embedded
+                            // cover decoded in full is ~8 MB of transient
+                            // garbage per row before being scaled to a ~144px
+                            // thumb. Sampling first cuts that ~16x.
+                            val bounds = BitmapFactory.Options().apply {
+                                inJustDecodeBounds = true
+                            }
+                            BitmapFactory.decodeByteArray(art, 0, art.size, bounds)
+                            var sample = 1
+                            val target = maxOf(targetX, targetY).coerceAtLeast(1)
+                            var w = bounds.outWidth
+                            var h = bounds.outHeight
+                            while (w / 2 >= target && h / 2 >= target && w > 0 && h > 0) {
+                                w /= 2
+                                h /= 2
+                                sample *= 2
+                            }
+                            val opts = BitmapFactory.Options().apply {
+                                inSampleSize = sample
+                            }
+                            BitmapFactory.decodeByteArray(art, 0, art.size, opts)
                         }
                     } finally {
                         // Never leak the native retriever (fds + native

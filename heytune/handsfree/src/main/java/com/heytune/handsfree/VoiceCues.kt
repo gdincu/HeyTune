@@ -52,7 +52,14 @@ object VoiceCues {
                 try { p.release() } catch (_: Exception) {}
                 true
             }
-            mp.start()
+            try {
+                mp.start()
+            } catch (e: Exception) {
+                // start() itself threw: the player would otherwise leak
+                // its native resources since neither listener fires.
+                try { mp.release() } catch (_: Exception) {}
+                throw e
+            }
         } catch (e: Exception) {
             Log.w(TAG, "cue play failed, falling back to tone", e)
             toneFallback(ok)
