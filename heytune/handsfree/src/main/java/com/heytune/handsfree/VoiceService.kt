@@ -190,9 +190,27 @@ class VoiceService : Service() {
     @Volatile
     private var cancelRequested = false
 
-    /** Arms one pause-triggered window; wakes the parked loop thread. */
+    /**
+     * Arms one pause-triggered window; wakes the parked loop thread.
+     *
+     * Deduplicates: one pause press fans out to TWO LISTEN_ONCE intents
+     * (in-app pause button via VoiceIntegration.listenOnce + MusicService
+     * onIsPlayingChanged auto-arm). Without this, the second intent queues
+     * a spare window that opens the mic AFTER the first window's command
+     * already resumed playback / changed the track — the "STT icon flashes
+     * during playback / when the next song starts" bug. While the mic is
+     * open or a window is already queued, further arms are ignored.
+     */
     private fun armWindow() {
         synchronized(lock) {
+            if (_isListening.value) {
+                Log.i(TAG, "armWindow: ignored (already listening)")
+                return
+            }
+            if (listenArmed) {
+                Log.i(TAG, "armWindow: ignored (already armed)")
+                return
+            }
             listenArmed = true
             cancelRequested = false
             armTime = SystemClock.elapsedRealtime()
