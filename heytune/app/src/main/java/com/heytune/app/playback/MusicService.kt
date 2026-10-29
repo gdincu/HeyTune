@@ -478,19 +478,41 @@ class MusicService : MediaLibraryService(),
     }
 
     fun triggerShuffle() {
-        val oldIndex = player.currentMediaItemIndex
-        queueBoard.value.setCurrQueuePosIndex(oldIndex)
-        val currentQueue = queueBoard.value.getCurrentQueue() ?: return
+        try {
+            if (!qbInit.value || player.mediaItemCount == 0) {
+                Log.w(TAG, "triggerShuffle: no active queue, ignoring")
+                return
+            }
+            val oldIndex = player.currentMediaItemIndex
+            if (oldIndex != C.INDEX_UNSET) {
+                queueBoard.value.setCurrQueuePosIndex(oldIndex)
+            }
+            val currentQueue = queueBoard.value.getCurrentQueue() ?: return
+            if (currentQueue.getSize() <= 1) {
+                // Nothing to shuffle, but keep player/queue flags in sync.
+                if (player.shuffleModeEnabled != currentQueue.shuffled) {
+                    player.shuffleModeEnabled = currentQueue.shuffled
+                }
+                updateNotification()
+                return
+            }
+            // Preserve resume position so a non-seamless reload doesn't jump
+            // to a stale saved position (looked like a rescan/restart).
+            currentQueue.lastSongPos = player.currentPosition
 
-        // shuffle and update player playlist
-        if (!currentQueue.shuffled) {
-            queueBoard.value.shuffleCurrent()
-        } else {
-            queueBoard.value.unShuffleCurrent()
+            // shuffle and update player playlist
+            if (!currentQueue.shuffled) {
+                queueBoard.value.shuffleCurrent()
+            } else {
+                queueBoard.value.unShuffleCurrent()
+            }
+            queueBoard.value.setCurrQueue()
+
+            updateNotification()
+        } catch (e: Exception) {
+            Log.e(TAG, "triggerShuffle failed", e)
+            reportException(e)
         }
-        queueBoard.value.setCurrQueue()
-
-        updateNotification()
     }
 
     suspend fun initQueue() {
@@ -687,12 +709,22 @@ class MusicService : MediaLibraryService(),
 // Misc
 
     fun updateNotification() {
+        // Use player.shuffleModeEnabled as the single source of truth: Android Auto
+        // reads this flag for its standard shuffle button, so the custom-layout
+        // button must agree with it (previously text used queue.shuffled while
+        // the icon used player.shuffleModeEnabled, showing conflicting state
+        // whenever the two desynced).
+        val shuffleOn = try {
+            player.shuffleModeEnabled
+        } catch (_: Exception) {
+            queueBoard.value.getCurrentQueue()?.shuffled == true
+        }
         mediaSession.setCustomLayout(
             listOf(
                 CommandButton.Builder(ICON_UNDEFINED)
-                    .setDisplayName(getString(if (queueBoard.value.getCurrentQueue()?.shuffled == true) R.string.action_shuffle_off else R.string.action_shuffle_on))
+                    .setDisplayName(getString(if (shuffleOn) R.string.action_shuffle_off else R.string.action_shuffle_on))
                     .setSessionCommand(CommandToggleShuffle)
-                    .setCustomIconResId(if (player.shuffleModeEnabled) R.drawable.shuffle_on else R.drawable.shuffle_off)
+                    .setCustomIconResId(if (shuffleOn) R.drawable.shuffle_on else R.drawable.shuffle_off)
                     .build(),
                 CommandButton.Builder(ICON_UNDEFINED)
                     .setDisplayName(
@@ -962,10 +994,25 @@ class MusicService : MediaLibraryService(),
     }
 
     override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
-        val q = queueBoard.value.getCurrentQueue()
-        player.setShuffleOrder(ShuffleOrder.UnshuffledShuffleOrder(player.mediaItemCount))
-        if (q == null || q.shuffled == shuffleModeEnabled) return
-        triggerShuffle()
+        try {
+            // Shuffle is implemented manually by reordering QueueBoard items.
+            // Force ExoPlayer's native shuffle off so it plays our order as-is.
+            // (Android Auto / notification toggles land here via COMMAND_SET_SHUFFLE_MODE.)
+            if (player.mediaItemCount > 0) {
+                player.setShuffleOrder(ShuffleOrder.UnshuffledShuffleOrder(player.mediaItemCount))
+            }
+            if (!qbInit.value) return
+            val q = queueBoard.value.getCurrentQueue()
+            if (q == null || q.shuffled == shuffleModeEnabled) {
+                // Already in sync (e.g. setCurrQueue echoed the flag back): just refresh UI.
+                updateNotification()
+                return
+            }
+            triggerShuffle()
+        } catch (e: Exception) {
+            Log.e(TAG, "onShuffleModeEnabledChanged failed", e)
+            reportException(e)
+        }
     }
 
 

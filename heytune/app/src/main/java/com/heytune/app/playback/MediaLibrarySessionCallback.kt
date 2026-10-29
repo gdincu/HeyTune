@@ -367,7 +367,7 @@ class MediaLibrarySessionCallback @Inject constructor(
         }
 
         val queueTitle = context.getString(R.string.android_auto)
-        service.queueBoard.value.addQueue(
+        val added = service.queueBoard.value.addQueue(
             queueTitle,
             queue.first.map { it.metadata },
             shuffled = false,
@@ -375,7 +375,25 @@ class MediaLibrarySessionCallback @Inject constructor(
             delta = false,
             startIndex = queue.second
         )
-        MediaItemsWithStartPosition(queue.first, queue.second, queue.third)
+        // Respect the current shuffle state (e.g. toggled from Android Auto).
+        // Previously this always stored shuffled=false while player.shuffleModeEnabled
+        // could still be true, desyncing QueueBoard (shuffled=false) from the player
+        // (shuffle=true). The next shuffle tap then hit the
+        // `q.shuffled == shuffleModeEnabled` early-return and appeared to do nothing.
+        val shuffleEnabled = try {
+            mediaSession.player.shuffleModeEnabled
+        } catch (_: Exception) {
+            false
+        }
+        if (shuffleEnabled && added != null && added.getSize() > 1) {
+            // Keep the tapped song first, shuffle the rest.
+            service.queueBoard.value.shuffle(added, preserveCurrent = true, bypassSaveToDb = false)
+            val shuffledItems = added.getCurrentQueueShuffled().map { it.toMediaItem() }
+            val newIndex = added.getQueuePosShuffled().coerceIn(0, shuffledItems.size - 1)
+            MediaItemsWithStartPosition(shuffledItems, newIndex, queue.third)
+        } else {
+            MediaItemsWithStartPosition(queue.first, queue.second, queue.third)
+        }
     }
 
     override fun onSearch(

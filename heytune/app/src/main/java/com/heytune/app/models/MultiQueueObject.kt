@@ -75,6 +75,10 @@ data class MultiQueueObject(
     }
 
     fun setCurrentQueuePos(index: Int) {
+        if (index == C.INDEX_UNSET || index < 0) {
+            // No active player index (e.g. empty timeline): keep current queue pos.
+            return
+        }
         if (getQueuePosShuffled() != index) {
 
             /**
@@ -82,8 +86,13 @@ data class MultiQueueObject(
              * To get the real queuePos of the song, look at the shuffleIndex value that equals the index provided
              */
             val newQueuePos = if (shuffled) {
-                queue.indexOf(queue.find { it.shuffleIndex == index })
+                val match = queue.find { it.shuffleIndex == index }
+                // Player timeline and QueueBoard desynced (e.g. fresh Auto queue):
+                // keep current pos instead of corrupting it to -1.
+                if (match == null) return
+                queue.indexOf(match)
             } else {
+                if (index < 0 || index >= queue.size) return
                 index
             }
 

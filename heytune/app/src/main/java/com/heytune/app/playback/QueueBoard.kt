@@ -536,10 +536,18 @@ class QueueBoard(
             return 0
         }
 
+        if (index < 0 || index >= masterQueues.size) {
+            return 0
+        }
+
         val item = masterQueues[index]
         if (QUEUE_DEBUG)
             Log.d(TAG, "Shuffling queue ${item.title}")
 
+        if (item.queue.isEmpty()) {
+            return 0
+        }
+        item.validateQueuePos()
         val currentSong = item.queue[item.queuePos]
 
         // shuffle & push the current song to top if requested to
@@ -758,7 +766,8 @@ class QueueBoard(
         }
 
         // I have no idea why this value gets reset to 0 by the end... but ig this works
-        val queuePos = item.getQueuePosShuffled()
+        item.validateQueuePos()
+        val queuePos = item.getQueuePosShuffled().coerceIn(0, item.getSize() - 1)
         val lastSongPos = if (shouldResume) item.lastSongPos else C.TIME_UNSET
         val realQueuePos = item.queuePos
         masterIndex = masterQueues.indexOf(item)
@@ -768,19 +777,20 @@ class QueueBoard(
         Log.d(
             TAG, "Setting current queue. in bounds: ${queuePos >= 0 && queuePos < mediaItems.size}, " +
                     "queuePos: $queuePos, real queuePos: ${realQueuePos}, lastSongPos: $lastSongPos" +
-                    "ids: ${player.player.currentMetadata?.id}, ${mediaItems[queuePos].id}"
+                    "ids: ${player.player.currentMetadata?.id}, ${mediaItems.getOrNull(queuePos)?.id}"
         )
         /**
          * current playing == jump target, do seamlessly
          */
-        val seamlessSupported = (queuePos < mediaItems.size)
+        val seamlessSupported = (queuePos >= 0 && queuePos < mediaItems.size)
+                && player.player.currentMediaItemIndex != C.INDEX_UNSET
                 && player.player.currentMetadata?.id == mediaItems[queuePos].id
         if (seamlessSupported) {
             Log.d(TAG, "Trying seamless queue switch. Is first song?: ${queuePos == 0}")
             val playerIndex = player.player.currentMediaItemIndex
+            val playerItemCount = player.player.mediaItemCount
 
             if (queuePos == 0) {
-                val playerItemCount = player.player.mediaItemCount
                 // player.player.replaceMediaItems seems to stop playback so we
                 // remove all songs except the currently playing one and then add the list of new items
                 if (playerIndex < playerItemCount - 1) {
@@ -790,15 +800,24 @@ class QueueBoard(
                     player.player.removeMediaItems(0, playerIndex)
                 }
                 // add all songs except the first one since it is already present and playing
-                player.player.addMediaItems(mediaItems.drop(1).map { it.toMediaItem() })
-            } else {
-                // replace items up to current playing, then replace items after current
+                if (mediaItems.size > 1) {
+                    player.player.addMediaItems(mediaItems.drop(1).map { it.toMediaItem() })
+                }
+            } else if (playerIndex in 0 until playerItemCount && queuePos in 0 until mediaItems.size) {
+                // replace items up to current playing, then replace items after current.
+                // Use mediaItemCount as the end bound: Int.MAX_VALUE crashes ExoPlayer
+                // with IllegalArgumentException (toIndex out of bounds).
                 player.player.replaceMediaItems(
                     0, playerIndex,
                     mediaItems.subList(0, queuePos).map { it.toMediaItem() })
+                // playerIndex shifted by (queuePos - playerIndex) after the first replace,
+                // current is now at queuePos; replace everything after it.
                 player.player.replaceMediaItems(
-                    queuePos + 1, Int.MAX_VALUE,
+                    queuePos + 1, player.player.mediaItemCount,
                     mediaItems.subList(queuePos + 1, mediaItems.size).map { it.toMediaItem() })
+            } else {
+                Log.d(TAG, "Seamless indices out of bounds, falling back to setMediaItems")
+                player.player.setMediaItems(mediaItems.map { it.toMediaItem() }, queuePos, lastSongPos)
             }
         } else {
             Log.d(TAG, "Seamless is not supported. Loading songs in directly")
