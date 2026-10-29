@@ -25,6 +25,7 @@ import android.util.Log
 import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
+import com.heytune.handsfree.ModelManager
 import com.heytune.handsfree.VoiceService
 import androidx.core.net.toUri
 import androidx.datastore.preferences.core.edit
@@ -849,7 +850,14 @@ class MusicService : MediaLibraryService(),
                     Log.i(TAG, "pause: skip STT arm (already listening)")
                 } else {
                     if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-                        try {
+                        // Don't wake VoiceService from a remote/Auto pause when
+                        // models were never downloaded: it would only post a
+                        // "models not ready" error onto the phone. The in-app
+                        // pause path (VoiceIntegration.listenOnce) handles the
+                        // first download with user consent.
+                        if (!ModelManager.modelsReady(this)) {
+                            Log.i(TAG, "pause: skip STT arm (models not downloaded)")
+                        } else try {
                             Log.i(TAG, "pause: arming STT window")
                             val intent = Intent(this, VoiceService::class.java).setAction(VoiceService.ACTION_LISTEN_ONCE)
                             // Use startService and let VoiceService promote itself.

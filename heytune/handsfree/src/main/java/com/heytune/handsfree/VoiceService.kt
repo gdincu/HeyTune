@@ -129,9 +129,24 @@ class VoiceService : Service() {
                 }
                 if (!ModelManager.modelsReady(this)) {
                     Log.w(TAG, "LISTEN_ONCE: models not ready")
-                    notify("Voice models not ready — enable driving mode once to download")
+                    notifyTransient("Voice models not ready — enable driving mode once to download")
                     if (needsFg) stopSelf()
                     return START_NOT_STICKY
+                }
+                // Remote/Auto pause arms bypass VoiceIntegration.prepareModels,
+                // which is the only other place that calls ensureLoaded().
+                // After a reboot or process restart nativeAvailable is still
+                // false even though the engine would load fine — try that
+                // first so we don't misreport a healthy arm64 device as
+                // "unavailable on this device/ABI".
+                if (!NeedleBridge.nativeAvailable) {
+                    try {
+                        val toolsJson = assets.open("handsfree_tools.json")
+                            .bufferedReader().use { it.readText() }
+                        ModelManager.ensureLoaded(this, toolsJson)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "LISTEN_ONCE: lazy engine load failed", e)
+                    }
                 }
                 Log.i(TAG, "LISTEN_ONCE: arming window (running=$running)")
                 // Self-heal before arming: a dead worker leaves a stale
@@ -141,7 +156,7 @@ class VoiceService : Service() {
                 if (!running) {
                     if (!NeedleBridge.nativeAvailable) {
                         Log.w(TAG, "LISTEN_ONCE: native engine unavailable")
-                        notify("Voice engine unavailable on this device/ABI")
+                        notifyTransient("Voice engine unavailable on this device/ABI")
                         stopSelf()
                         return START_NOT_STICKY
                     }
@@ -150,6 +165,9 @@ class VoiceService : Service() {
                 } else {
                     Log.i(TAG, "LISTEN_ONCE: re-armed while running")
                 }
+                // Success path: drop any stale error notification (e.g. an
+                // earlier "engine unavailable" posted before the lazy load).
+                if (running || _isListening.value || listenArmed) clearError()
                 return START_STICKY
             }
             ACTION_CANCEL_WINDOW -> {
@@ -170,11 +188,12 @@ class VoiceService : Service() {
 
     private fun startVoice() {
         if (!NeedleBridge.nativeAvailable) {
-            notify("Voice engine unavailable on this device/ABI")
+            notifyTransient("Voice engine unavailable on this device/ABI")
             stopSelf()
             return
         }
         running = true
+        clearError()
         worker = newWorker()
     }
 
@@ -212,6 +231,10 @@ class VoiceService : Service() {
 
     override fun onDestroy() {
         stopVoice()
+        // Don't leave a stale "engine unavailable / models not ready"
+        // error pinned on the phone after the session ends.
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        clearError()
         super.onDestroy()
     }
 
@@ -621,8 +644,36 @@ class VoiceService : Service() {
             .build()
     }
 
+    /**
+     * Foreground-service notification (ongoing). Only for the live
+     * listening/ready state promoted via startForeground().
+     */
     private fun notify(text: String) {
+        notifyTransient(text)
+    }
+
+    /**
+     * One-shot status/error toasts-as-notifications. Deliberately NOT
+     * ongoing: the old ongoing builder left "Voice engine unavailable"
+     * pinned on the phone long after the Auto session that triggered it.
+     */
+    private fun notifyTransient(text: String) {
         val mgr = getSystemService(NotificationManager::class.java)
-        mgr.notify(NOTIF_ID + 1, notification(text))
+        val n = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("HeyTune")
+            .setContentText(text)
+            .setSmallIcon(android.R.drawable.ic_btn_speak_now)
+            .setOngoing(false)
+            .setAutoCancel(true)
+            .setTimeoutAfter(10_000L)
+            .build()
+        mgr.notify(NOTIF_ID + 1, n)
+    }
+
+    private fun clearError() {
+        try {
+            getSystemService(NotificationManager::class.java).cancel(NOTIF_ID + 1)
+        } catch (_: Exception) {
+        }
     }
 }
