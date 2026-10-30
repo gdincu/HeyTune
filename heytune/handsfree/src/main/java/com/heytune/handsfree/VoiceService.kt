@@ -46,9 +46,10 @@ class VoiceService : Service() {
         const val ACTION_STOP = "com.heytune.handsfree.STOP"
 
         /**
-         * One-shot listen, armed ONLY by the in-app pause button. Opens a
-         * wake-free window; the service stops itself afterwards unless
-         * driving mode is on.
+         * One-shot listen, armed ONLY by the in-app pause button while
+         * driving mode is ON. Opens a wake-free window; the service stops
+         * itself afterwards unless driving mode is still on. Ignored
+         * entirely when driving mode is OFF (no mic).
          */
         const val ACTION_LISTEN_ONCE = "com.heytune.handsfree.LISTEN_ONCE"
 
@@ -119,6 +120,17 @@ class VoiceService : Service() {
             }
             ACTION_LISTEN_ONCE -> {
                 settings = VoiceSettings.load(this)
+                // OFF = no mic at all: drop arms from stale callers (e.g. a
+                // pause pressed just before the toggle) without opening the mic.
+                if (!settings.enabled) {
+                    Log.i(TAG, "LISTEN_ONCE: ignored (driving mode off)")
+                    if (running) stopVoice()
+                    // Always stop: startService() created this instance even
+                    // though no window will run; without this a stale arm
+                    // would leave an idle started service lingering.
+                    stopSelf()
+                    return START_NOT_STICKY
+                }
                 // Promote to foreground immediately when started via
                 // startForegroundService (e.g. MusicService remote pause).
                 // Otherwise an early return (model not ready / no native)
@@ -387,8 +399,9 @@ class VoiceService : Service() {
                 releaseListenLock()
                 synchronized(lock) { windowClaimed = false }
             }
-            // Pause-only use: stop after the window unless driving mode
-            // keeps the service alive for the next pause press.
+            // Re-read: the user may have toggled driving mode OFF mid-window.
+            // OFF = no mic at all, so never stay parked for the next pause.
+            settings = VoiceSettings.load(this)
             if (!settings.enabled) {
                 stopVoice()
                 stopSelf()

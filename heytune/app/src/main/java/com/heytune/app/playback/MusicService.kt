@@ -90,6 +90,7 @@ import com.heytune.app.constants.RepeatModeKey
 import com.heytune.app.constants.SkipOnErrorKey
 import com.heytune.app.constants.SkipSilenceKey
 import com.heytune.app.constants.StopMusicOnTaskClearKey
+import com.heytune.app.constants.VoiceDrivingModeKey
 import com.heytune.app.constants.minPlaybackDurKey
 import com.heytune.app.db.MusicDatabase
 import com.heytune.app.db.entities.Event
@@ -829,7 +830,7 @@ class MusicService : MediaLibraryService(),
             val q = queueBoard.value.getCurrentQueue()
             q?.lastSongPos = pos
             // Remote pause (notification / Android Auto / headset) -> arm STT
-            // Mirrors in-app pause-to-talk.
+            // when driving mode is ON. When OFF, never touch the mic.
             //
             // Guard: track changes (next/prev/auto-advance, voice play_song)
             // report isPlaying=false while BUFFERING with playWhenReady=true.
@@ -848,6 +849,8 @@ class MusicService : MediaLibraryService(),
                     Log.i(TAG, "pause: skip STT arm (voice pause <5s ago)")
                 } else if (VoiceService.isListening.value) {
                     Log.i(TAG, "pause: skip STT arm (already listening)")
+                } else if (!dataStore.get(VoiceDrivingModeKey, false)) {
+                    Log.i(TAG, "pause: skip STT arm (driving mode off)")
                 } else {
                     if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
                         // Don't wake VoiceService from a remote/Auto pause when

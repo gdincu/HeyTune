@@ -106,8 +106,11 @@ object VoiceIntegration {
     }
 
     suspend fun isDrivingMode(activity: MainActivity): Boolean =
+        isDrivingMode(activity.applicationContext)
+
+    suspend fun isDrivingMode(context: android.content.Context): Boolean =
         withContext(Dispatchers.IO) {
-            activity.dataStore.data.first()[VoiceDrivingModeKey] == true
+            context.dataStore.data.first()[VoiceDrivingModeKey] == true
         }
 
     /**
@@ -127,6 +130,16 @@ object VoiceIntegration {
                 }
             }
             if (!enabled) {
+                // OFF = no mic at all: mirror to the :handsfree module pref
+                // (VoiceService gates LISTEN_ONCE + keep-alive on it), then
+                // stop the service. ACTION_STOP's stopVoice() already drops
+                // any in-flight window, so no separate CANCEL is needed
+                // (it would pointlessly create the service when idle).
+                withContext(Dispatchers.IO) {
+                    VoiceSettings.load(activity).copy(enabled = false).save(activity)
+                }
+                pendingStart = false
+                pendingListenOnce = false
                 stopVoice(activity)
                 onDone(true)
                 return@launch
@@ -143,10 +156,11 @@ object VoiceIntegration {
     }
 
     /**
-     * Pause-button voice trigger: tapping pause stops the music (so the mic
-     * hears no background noise) and opens one English-only listen window.
-     * Call this AFTER pausing playback. The service stops itself afterwards
-     * unless driving mode is on. Never touches the driving-mode setting.
+     * Pause-button voice trigger: when driving mode is ON, tapping pause
+     * stops the music (so the mic hears no background noise) and opens one
+     * English-only listen window. When driving mode is OFF this is a no-op
+     * (no mic). Call this AFTER pausing playback. Never touches the
+     * driving-mode setting.
      */
     fun onPausePressed(activity: MainActivity) = listenOnce(activity)
 
@@ -164,14 +178,20 @@ object VoiceIntegration {
     }
 
     /**
-     * One-shot voice command, armed ONLY by the in-app pause button: same
-     * model prep as driving mode, then a single wake-free English-only
-     * window. The service stops itself afterwards unless driving mode is on.
-     * Never touches the driving-mode setting.
+     * One-shot voice command, armed ONLY by the in-app pause button when
+     * driving mode is ON: same model prep as driving mode, then a single
+     * wake-free English-only window. When driving mode is OFF this is a
+     * no-op (no mic, no permission prompt, no download). Never touches the
+     * driving-mode setting.
      */
     fun listenOnce(activity: MainActivity) {
         Log.i(TAG, "listenOnce")
         activity.lifecycleScope.launch {
+            if (!isDrivingMode(activity)) {
+                Log.i(TAG, "listenOnce: ignored (driving mode off)")
+                pendingListenOnce = false
+                return@launch
+            }
             if (!hasMicPermission(activity)) {
                 Log.i(TAG, "listenOnce: requesting mic permission")
                 pendingListenOnce = true
@@ -248,6 +268,7 @@ object VoiceIntegration {
         if (!ok) {
             withContext(Dispatchers.IO) {
                 activity.dataStore.edit { it[VoiceDrivingModeKey] = false }
+                VoiceSettings.load(activity).copy(enabled = false).save(activity)
             }
             onDone(false)
             return
