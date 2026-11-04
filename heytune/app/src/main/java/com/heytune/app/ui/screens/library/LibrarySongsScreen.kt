@@ -67,7 +67,6 @@ import com.heytune.app.constants.SongSortDescendingKey
 import com.heytune.app.constants.SongSortType
 import com.heytune.app.constants.SongSortTypeKey
 import com.heytune.app.constants.SwipeToQueueKey
-import com.heytune.app.db.entities.Song
 import com.heytune.app.models.toMediaMetadata
 import com.heytune.app.playback.queues.ListQueue
 import com.heytune.app.ui.component.ChipsRow
@@ -363,24 +362,26 @@ fun LibrarySongsScreen(
         )
 
         FloatingFooter(visible = inSelectMode && songs != null) {
-            val s: List<Song> = (songs as Iterable<Song>).toList()
-            // Index once: the old selection.mapNotNull { s.find { ... } } was
-            // O(selected * total) on every recomposition while in select mode.
-            val songById = remember(songs) { songs.associateBy { it.id } }
-            SelectHeader(
-                navController = navController,
-                selectedItems = selection.mapNotNull { songId ->
-                    songById[songId]
-                }.map { it.toMediaMetadata() },
-                totalItemCount = s.size,
-                onSelectAll = {
-                    selection.clear()
-                    selection.addAll(s.map { it.id })
-                },
-                onDeselectAll = { selection.clear() },
-                menuState = menuState,
-                onDismiss = onExitSelectionMode
-            )
+            val currentSongs = songs
+            if (currentSongs != null) {
+                // Index once: the old selection.mapNotNull { s.find { ... } } was
+                // O(selected * total) on every recomposition while in select mode.
+                val songById = remember(currentSongs) { currentSongs.associateBy { it.id } }
+                SelectHeader(
+                    navController = navController,
+                    selectedItems = selection.mapNotNull { songId ->
+                        songById[songId]
+                    }.map { it.toMediaMetadata() },
+                    totalItemCount = currentSongs.size,
+                    onSelectAll = {
+                        selection.clear()
+                        selection.addAll(currentSongs.map { it.id })
+                    },
+                    onDeselectAll = { selection.clear() },
+                    menuState = menuState,
+                    onDismiss = onExitSelectionMode
+                )
+            }
         }
         SnackbarHost(
             hostState = snackbarHostState,
