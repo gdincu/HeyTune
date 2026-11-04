@@ -110,8 +110,6 @@ import com.heytune.app.lyrics.LyricsHelper
 import com.heytune.app.models.MediaMetadata
 import com.heytune.app.models.MultiQueueObject
 import com.heytune.app.models.toMediaMetadata
-import com.heytune.app.models.toMediaMetadata
-import com.heytune.app.playback.queues.ListQueue
 import com.heytune.app.playback.queues.ListQueue
 import com.heytune.app.playback.queues.Queue
 import com.heytune.app.utils.CoilBitmapLoader

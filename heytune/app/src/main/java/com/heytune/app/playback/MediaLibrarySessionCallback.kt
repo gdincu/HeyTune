@@ -290,6 +290,7 @@ class MediaLibrarySessionCallback @Inject constructor(
 
                     else -> emptyList()
                 }
+            }
         LibraryResult.ofItemList(paginate(full, page, pageSize), params)
     }
 
