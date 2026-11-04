@@ -469,6 +469,31 @@ class QueueBoard(
     fun unShuffleCurrent() = unShuffle(masterIndex)
 
     /**
+     * Mark a queue as current without loading it into the player.
+     *
+     * Used by the Android Auto path (onSetMediaItems): Media3 sets the player
+     * timeline itself from the returned items, so [setCurrQueue] must NOT run
+     * (it would load a duplicate/stale timeline into the player), but the
+     * board's current index must still track the Auto queue. Otherwise later
+     * shuffle toggles operate on a stale queue and appear to do nothing.
+     */
+    fun makeCurrent(item: MultiQueueObject) {
+        if (!masterQueues.contains(item)) return
+        bubbleUp(item)
+    }
+
+    /**
+     * Un-shuffles a queue object
+     *
+     * @return New current position tracker
+     */
+    fun unShuffle(q: MultiQueueObject): Int {
+        val index = masterQueues.indexOf(q)
+        if (index == -1) return q.queuePos
+        return unShuffle(index)
+    }
+
+    /**
      * Un-shuffles a queue
      *
      * @return New current position tracker

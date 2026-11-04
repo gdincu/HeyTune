@@ -375,22 +375,45 @@ class MediaLibrarySessionCallback @Inject constructor(
             delta = false,
             startIndex = queue.second
         )
-        // Respect the current shuffle state (e.g. toggled from Android Auto).
-        // Previously this always stored shuffled=false while player.shuffleModeEnabled
-        // could still be true, desyncing QueueBoard (shuffled=false) from the player
-        // (shuffle=true). The next shuffle tap then hit the
-        // `q.shuffled == shuffleModeEnabled` early-return and appeared to do nothing.
+        // Keep QueueBoard in sync with the player shuffle flag, in BOTH directions.
+        // addQueue() is called with shuffled=false and its replace/jump-only paths
+        // leave a stale shuffled=true flag behind (they only shuffle when the param
+        // is true, never unshuffle). A stale flag makes the next shuffle toggle hit
+        // the `q.shuffled == shuffleModeEnabled` early-return in
+        // onShuffleModeEnabledChanged and appear to do nothing, while the timeline
+        // itself plays sequentially. Also make the Auto queue current: unlike every
+        // other addQueue caller, this path never calls setCurrQueue (Media3 sets the
+        // timeline from the returned items), so without an explicit makeCurrent the
+        // board keeps pointing at the previous queue and later shuffle toggles
+        // shuffle the wrong queue.
         val shuffleEnabled = try {
             mediaSession.player.shuffleModeEnabled
         } catch (_: Exception) {
             false
         }
-        if (shuffleEnabled && added != null && added.getSize() > 1) {
-            // Keep the tapped song first, shuffle the rest.
-            service.queueBoard.value.shuffle(added, preserveCurrent = true, bypassSaveToDb = false)
-            val shuffledItems = added.getCurrentQueueShuffled().map { it.toMediaItem() }
-            val newIndex = added.getQueuePosShuffled().coerceIn(0, shuffledItems.size - 1)
-            MediaItemsWithStartPosition(shuffledItems, newIndex, queue.third)
+        if (added != null) {
+            if (shuffleEnabled) {
+                if (added.getSize() > 1) {
+                    // (Re)shuffle even if the flag already says shuffled: replaceAll
+                    // resets shuffleIndexes to sequential order, so flag==true alone
+                    // does not mean the order is actually shuffled. Keep tapped song first.
+                    service.queueBoard.value.shuffle(added, preserveCurrent = true, bypassSaveToDb = false)
+                    val shuffledItems = added.getCurrentQueueShuffled().map { it.toMediaItem() }
+                    val newIndex = added.getQueuePosShuffled().coerceIn(0, shuffledItems.size - 1)
+                    MediaItemsWithStartPosition(shuffledItems, newIndex, queue.third)
+                } else {
+                    // Single song: nothing to reorder, just track it as current.
+                    service.queueBoard.value.makeCurrent(added)
+                    MediaItemsWithStartPosition(queue.first, queue.second, queue.third)
+                }
+            } else {
+                if (added.shuffled) {
+                    service.queueBoard.value.unShuffle(added)
+                } else {
+                    service.queueBoard.value.makeCurrent(added)
+                }
+                MediaItemsWithStartPosition(queue.first, queue.second, queue.third)
+            }
         } else {
             MediaItemsWithStartPosition(queue.first, queue.second, queue.third)
         }
