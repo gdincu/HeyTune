@@ -53,6 +53,12 @@ object CommandParser {
         if (low.contains("stop shuffling") || low.contains("disable shuffle")) {
             return ToolCall("toggle_shuffle", mapOf("on" to false))
         }
+        // Bare "shuffle" means shuffle-on, not a random song: the random rule
+        // below used to swallow it ("shuffle" listed as a random trigger),
+        // firing play_random_song while driving when the user wanted shuffle.
+        if (low == "shuffle" || low == "shuffle music" || low == "shuffle songs") {
+            return ToolCall("toggle_shuffle", mapOf("on" to true))
+        }
         repeatState.find(t)?.let {
             return ToolCall("set_repeat_mode", mapOf("mode" to it.groups["mode"]!!.value.lowercase()))
         }
@@ -79,7 +85,7 @@ object CommandParser {
         }
         if (Regex("""\b(random|surprise me|shuffle play)\b""", RegexOption.IGNORE_CASE).containsMatchIn(t) ||
             low.contains("play a random") || low.contains("play random") ||
-            low.contains("play something random") || low == "random" || low == "shuffle") {
+            low.contains("play something random") || low == "random") {
             return ToolCall("play_random_song")
         }
         playQuery.find(t)?.let {

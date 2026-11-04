@@ -10,6 +10,8 @@ import androidx.media3.common.Player.REPEAT_MODE_ONE
 import androidx.media3.session.MediaController
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executor
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 
 /**
  * Bridge between voice tool calls and HeyTune playback.
@@ -30,6 +32,10 @@ class PlayerBridge(private val controller: MediaController) {
      * (else `IllegalStateException: called from a wrong thread`). VoiceService
      * calls this from its background mic thread, so marshal there and block
      * briefly for the result; already-main callers run inline.
+     *
+     * The wait is bounded: a wedged main thread (ANR, heavy DB work) must
+     * fail this one window, not wedge the voice worker (and its wake lock)
+     * forever.
      */
     fun dispatch(calls: List<ToolCall>): List<Any?> {
         if (Looper.myLooper() == Looper.getMainLooper()) {
@@ -47,7 +53,9 @@ class PlayerBridge(private val controller: MediaController) {
                 done.countDown()
             }
         }
-        done.await()
+        if (!done.await(DISPATCH_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+            throw TimeoutException("voice dispatch timed out after $DISPATCH_TIMEOUT_MS ms")
+        }
         error?.let { throw it }
         return result
     }
@@ -125,6 +133,9 @@ class PlayerBridge(private val controller: MediaController) {
         private set
 
     companion object {
+        /** Max wait for the main thread to run a dispatch from the mic thread. */
+        const val DISPATCH_TIMEOUT_MS = 5_000L
+
         /** Diffusion-free helper: run a block when the controller is ready. */
         fun withController(
             controllerFuture: com.google.common.util.concurrent.ListenableFuture<MediaController>,

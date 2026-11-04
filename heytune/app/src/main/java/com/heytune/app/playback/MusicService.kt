@@ -27,6 +27,10 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
 import com.heytune.handsfree.ModelManager
 import com.heytune.handsfree.VoiceService
+import com.heytune.handsfree.CommandParser
+import com.heytune.handsfree.PlayerBridge
+import com.heytune.handsfree.VoiceCues
+import com.heytune.handsfree.VoiceSettings
 import androidx.core.net.toUri
 import androidx.datastore.preferences.core.edit
 import androidx.media3.common.AudioAttributes
@@ -106,6 +110,8 @@ import com.heytune.app.lyrics.LyricsHelper
 import com.heytune.app.models.MediaMetadata
 import com.heytune.app.models.MultiQueueObject
 import com.heytune.app.models.toMediaMetadata
+import com.heytune.app.models.toMediaMetadata
+import com.heytune.app.playback.queues.ListQueue
 import com.heytune.app.playback.queues.ListQueue
 import com.heytune.app.playback.queues.Queue
 import com.heytune.app.utils.CoilBitmapLoader
@@ -261,7 +267,13 @@ class MusicService : MediaLibraryService(),
         // Keep a connected controller so that notification works
         val sessionToken = SessionToken(this, ComponentName(this, MusicService::class.java))
         val controllerFuture = MediaController.Builder(this, sessionToken).buildAsync()
-        controllerFuture.addListener({ controllerFuture.get() }, MoreExecutors.directExecutor())
+        controllerFuture.addListener({
+            try {
+                ensureVoiceBridge(controllerFuture.get())
+            } catch (e: Exception) {
+                Log.w(TAG, "voice bridge install failed", e)
+            }
+        }, MoreExecutors.directExecutor())
 
         connectivityManager = getSystemService()!!
 
@@ -353,6 +365,142 @@ class MusicService : MediaLibraryService(),
     fun toggleStartRadio() {
         val mediaMetadata = player.currentMetadata ?: return
 //        playQueue(YouTubeQueue.radio(mediaMetadata), isRadio = true)
+    }
+
+
+// Voice driving-mode fallback (Auto-only sessions)
+    /**
+     * Installs a service-scoped [PlayerBridge] when the UI hasn't provided
+     * one. Android Auto can start this service without ever opening
+     * MainActivity, in which case VoiceIntegration.onControllerReady never
+     * runs and VoiceService would otherwise drop every utterance with
+     * "no playerBridge". The UI bridge (activity-scoped search with toasts)
+     * still takes precedence: this is a no-op when one is already set.
+     */
+    private fun ensureVoiceBridge(controller: MediaController) {
+        if (VoiceService.playerBridge != null) return
+        VoiceService.playerBridge = PlayerBridge(controller).apply {
+            onLikeRequest = { toggleLike() }
+            onRandomPlayRequest = {
+                scope.launch(Dispatchers.IO) { playRandomService() }
+                true
+            }
+            onPlaySearchRequest = { query ->
+                if (query.isBlank()) {
+                    false
+                } else {
+                    scope.launch(Dispatchers.IO) { searchAndPlayService(query) }
+                    true
+                }
+            }
+        }
+        Log.i(TAG, "Voice bridge installed (service fallback, Auto-only sessions)")
+    }
+
+    /** Service-scoped "play X": same library search as the UI path, no activity. */
+    private suspend fun searchAndPlayService(query: String) {
+        try {
+            val q = CommandParser.normalize(query)
+            if (q.isEmpty()) {
+                Log.i(TAG, "voice play: empty query after normalize ('$query')")
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@MusicService, getString(R.string.voice_not_heard), Toast.LENGTH_SHORT).show()
+                }
+                VoiceCues.playError(this@MusicService)
+                return
+            }
+            val songHits = database.searchSongs(q).first()
+            val artistHits = database.searchArtistSongs(q).first()
+            val songs = (songHits + artistHits).distinctBy { it.id }
+            if (songs.isEmpty()) {
+                Log.i(TAG, "voice play: no local results for '$query' (normalized '$q')")
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@MusicService, getString(R.string.voice_song_not_found, query), Toast.LENGTH_LONG).show()
+                }
+                VoiceCues.playError(this@MusicService)
+                return
+            }
+            val isArtistIntent = artistHits.isNotEmpty() && songHits.isEmpty()
+            val ordered = if (isArtistIntent) songs.shuffled() else songs
+            val items = ordered.map { it.toMediaMetadata() }
+            withContext(Dispatchers.Main) {
+                VoiceCues.playOk(this@MusicService)
+                playQueue(
+                    ListQueue(
+                        title = "Voice: $query",
+                        items = items,
+                        startIndex = 0,
+                    ),
+                )
+            }
+            Log.i(TAG, "voice play: '$query' -> ${songs.size} result(s), playing ${if (isArtistIntent) "random" else "first"}")
+        } catch (e: Exception) {
+            Log.w(TAG, "voice play failed for '$query'", e)
+            reportException(e)
+            VoiceCues.playError(this@MusicService)
+        }
+    }
+
+    /** Service-scoped "play something random": no activity required. */
+    private suspend fun playRandomService() {
+        try {
+            val all = database.allLocalSongs()
+            if (all.isEmpty()) {
+                Log.i(TAG, "voice random: empty library")
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@MusicService, getString(R.string.voice_library_empty), Toast.LENGTH_LONG).show()
+                }
+                VoiceCues.playError(this@MusicService)
+                return
+            }
+            val pick = all.random()
+            val items = listOf(pick.toMediaMetadata())
+            withContext(Dispatchers.Main) {
+                VoiceCues.playOk(this@MusicService)
+                playQueue(
+                    ListQueue(
+                        title = "Random",
+                        items = items,
+                        startIndex = 0,
+                    ),
+                )
+            }
+            Log.i(TAG, "voice random -> ${pick.song.title} (${all.size} total)")
+        } catch (e: Exception) {
+            Log.w(TAG, "voice random failed", e)
+            reportException(e)
+            VoiceCues.playError(this@MusicService)
+        }
+    }
+
+    /**
+     * Arms one STT window from a (possibly background) pause. Plain
+     * startService is denied on newer Android when the app is in the
+     * background (Auto, screen off); fall back to a foreground-service
+     * start, which our own foreground playback state allows.
+     */
+    private fun armVoiceWindowFromPause() {
+        val intent = Intent(this, VoiceService::class.java).setAction(VoiceService.ACTION_LISTEN_ONCE)
+        try {
+            Log.i(TAG, "pause: arming STT window")
+            startService(intent)
+        } catch (e: SecurityException) {
+            Log.w(TAG, "pause: startService denied, trying FGS", e)
+            tryFgsArm(intent)
+        } catch (e: IllegalStateException) {
+            Log.w(TAG, "pause: startService blocked (background), trying FGS", e)
+            tryFgsArm(intent)
+        } catch (e: Exception) {
+            Log.w(TAG, "remote pause voice arm failed", e)
+        }
+    }
+
+    private fun tryFgsArm(intent: Intent) {
+        try {
+            ContextCompat.startForegroundService(this, intent)
+        } catch (e: Exception) {
+            Log.w(TAG, "remote pause voice arm denied (background FGS restriction); use in-app pause", e)
+        }
     }
 
 
@@ -849,29 +997,57 @@ class MusicService : MediaLibraryService(),
                     Log.i(TAG, "pause: skip STT arm (voice pause <5s ago)")
                 } else if (VoiceService.isListening.value) {
                     Log.i(TAG, "pause: skip STT arm (already listening)")
-                } else if (!dataStore.get(VoiceDrivingModeKey, false)) {
-                    Log.i(TAG, "pause: skip STT arm (driving mode off)")
                 } else {
-                    if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                    // DataStore reads block (runBlocking): never do this on the
+                    // ExoPlayer main-thread callback. Snapshot the sync guards
+                    // now, resolve driving-mode/models off-thread, then arm.
+                    val playWhenReadySnapshot = player.playWhenReady
+                    scope.launch {
+                        val drivingMode = try {
+                            withContext(Dispatchers.IO) {
+                                dataStore.data.first()[VoiceDrivingModeKey] == true
+                            }
+                        } catch (_: Exception) {
+                            false
+                        }
+                        if (!drivingMode) {
+                            Log.i(TAG, "pause: skip STT arm (driving mode off)")
+                            return@launch
+                        }
+                        if (VoiceService.isListening.value) {
+                            Log.i(TAG, "pause: skip STT arm (already listening)")
+                            return@launch
+                        }
+                        if (playWhenReadySnapshot) return@launch
+                        if (ContextCompat.checkSelfPermission(this@MusicService, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                            Log.i(TAG, "pause: skip STT arm (no mic permission)")
+                            return@launch
+                        }
+                        // Self-heal the module pref: DataStore is the source of
+                        // truth, but VoiceService gates on SharedPrefs. If they
+                        // ever desync (stale toggle, restore), an arm that
+                        // passed here would be dropped there as "driving mode
+                        // off". Only heals false->true; OFF stays OFF.
+                        try {
+                            val vs = VoiceSettings.load(this@MusicService)
+                            if (!vs.enabled) {
+                                vs.copy(enabled = true).save(this@MusicService)
+                                Log.i(TAG, "pause: healed voice pref desync (driving mode on)")
+                            }
+                        } catch (_: Exception) {
+                        }
                         // Don't wake VoiceService from a remote/Auto pause when
                         // models were never downloaded: it would only post a
                         // "models not ready" error onto the phone. The in-app
                         // pause path (VoiceIntegration.listenOnce) handles the
                         // first download with user consent.
-                        if (!ModelManager.modelsReady(this)) {
+                        if (!ModelManager.modelsReady(this@MusicService)) {
                             Log.i(TAG, "pause: skip STT arm (models not downloaded)")
-                        } else try {
-                            Log.i(TAG, "pause: arming STT window")
-                            val intent = Intent(this, VoiceService::class.java).setAction(VoiceService.ACTION_LISTEN_ONCE)
-                            // Use startService and let VoiceService promote itself.
-                            // startForegroundService here triggers FGS timeout if VoiceService
-                            // does early stopSelf (model not ready) without startForeground.
-                            startService(intent)
-                        } catch (_: Exception) {
-                            Log.w(TAG, "remote pause voice arm failed")
+                            return@launch
                         }
-                    } else {
-                        Log.i(TAG, "pause: skip STT arm (no mic permission)")
+                        withContext(Dispatchers.Main) {
+                            armVoiceWindowFromPause()
+                        }
                     }
                 }
             } else if (!isPlaying) {

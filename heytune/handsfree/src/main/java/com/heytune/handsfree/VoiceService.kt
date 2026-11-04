@@ -497,6 +497,8 @@ class VoiceService : Service() {
         val samples = WakeWordDetector.toFloatMono(pcm)
         val bridge = playerBridge ?: run {
             Log.w(TAG, "utterance: no playerBridge, dropping ${pcm.size} samples")
+            notify("Voice not ready — open HeyTune once")
+            VoiceCues.playError(this)
             return
         }
 

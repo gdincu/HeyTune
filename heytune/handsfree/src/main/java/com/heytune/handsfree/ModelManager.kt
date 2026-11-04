@@ -60,13 +60,36 @@ object ModelManager {
     /**
      * Download any missing .cact files. Progress is 0..1 across both files.
      * Throws on network errors; leaves any .part file for resume on next run.
+     * Each file is retried once: a single dropped connection (tunnel, mobile
+     * handover while driving) must not fail the whole driving-mode toggle.
      */
     suspend fun downloadMissing(
         context: Context,
         onProgress: (fraction: Float, file: String) -> Unit = { _, _ -> },
     ): Unit = withContext(Dispatchers.IO) {
-        downloadOne(WHISTLE_URL, whistleFile(context), MIN_WHISTLE_BYTES, 0f, 0.4f, onProgress)
-        downloadOne(NEEDLE_URL, needleFile(context), MIN_NEEDLE_BYTES, 0.4f, 1f, onProgress)
+        downloadOneWithRetry(WHISTLE_URL, whistleFile(context), MIN_WHISTLE_BYTES, 0f, 0.4f, onProgress)
+        downloadOneWithRetry(NEEDLE_URL, needleFile(context), MIN_NEEDLE_BYTES, 0.4f, 1f, onProgress)
+    }
+
+    private fun downloadOneWithRetry(
+        url: String,
+        dest: File,
+        minBytes: Long,
+        rangeStart: Float,
+        rangeEnd: Float,
+        onProgress: (Float, String) -> Unit,
+    ) {
+        try {
+            downloadOne(url, dest, minBytes, rangeStart, rangeEnd, onProgress)
+        } catch (e: IOException) {
+            Log.w(TAG, "download of ${dest.name} failed, retrying once", e)
+            try {
+                Thread.sleep(1_000L)
+            } catch (_: InterruptedException) {
+                throw e
+            }
+            downloadOne(url, dest, minBytes, rangeStart, rangeEnd, onProgress)
+        }
     }
 
     private fun downloadOne(

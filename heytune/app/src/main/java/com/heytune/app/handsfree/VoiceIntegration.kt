@@ -29,7 +29,9 @@ import com.heytune.handsfree.PlayerBridge
 import com.heytune.handsfree.VoiceCues
 import com.heytune.handsfree.VoiceService
 import com.heytune.handsfree.VoiceSettings
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -44,6 +46,15 @@ import kotlinx.coroutines.withContext
  */
 object VoiceIntegration {
     private const val TAG = "VoiceIntegration"
+
+    /**
+     * Activity-independent scope for async voice work (search+play fan-out).
+     * lifecycleScope would cancel these when the activity is gone
+     * (screen-off / Auto-only session), silently dropping the command after
+     * it was already acknowledged. UI toasts/cues use the application
+     * context so they survive too.
+     */
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private var micPermissionLauncher: ActivityResultLauncher<String>? = null
     private var pendingStart = false
@@ -85,14 +96,14 @@ object VoiceIntegration {
                 if (query.isBlank()) {
                     false
                 } else {
-                    activity.lifecycleScope.launch(Dispatchers.IO) {
+                    appScope.launch {
                         searchAndPlay(activity, playerConnection, query)
                     }
                     true
                 }
             }
             onRandomPlayRequest = {
-                activity.lifecycleScope.launch(Dispatchers.IO) {
+                appScope.launch {
                     playRandom(activity, playerConnection)
                 }
                 true
@@ -148,7 +159,17 @@ object VoiceIntegration {
                 startVoice(activity, onProgress, onDone)
             } else {
                 pendingStart = true
-                // Optimistically persist; actual start happens on grant.
+                // Don't leave DataStore=true while permission is pending:
+                // the toggle UI already flipped back via onDone(false), and a
+                // stale true would arm the mic path (DataStore gate) only to
+                // be dropped at the service gate (module pref) — or worse,
+                // healed to fully-on by the pref self-heal without consent.
+                // Revert now; the grant callback re-enables on success.
+                withContext(Dispatchers.IO) {
+                    activity.dataStore.edit {
+                        it[VoiceDrivingModeKey] = false
+                    }
+                }
                 micPermissionLauncher?.launch(Manifest.permission.RECORD_AUDIO)
                 onDone(false)
             }
@@ -313,6 +334,10 @@ object VoiceIntegration {
         playerConnection: PlayerConnection,
         query: String,
     ) {
+        // Application context: this runs in appScope and may outlive the
+        // activity (Auto-only / screen-off). Never touch the activity for
+        // toasts, cues or strings here.
+        val app = activity.applicationContext
         try {
             // Engine/fallback queries may carry STT punctuation ("Play, let
             // it be."). Room LIKE is literal, so normalize before searching
@@ -321,13 +346,12 @@ object VoiceIntegration {
             if (q.isEmpty()) {
                 Log.i(TAG, "voice play: empty query after normalize ('$query')")
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(
-                        activity,
-                        activity.getString(R.string.voice_not_heard),
-                        Toast.LENGTH_SHORT,
-                    ).show()
+                    try {
+                        Toast.makeText(app, app.getString(R.string.voice_not_heard), Toast.LENGTH_SHORT).show()
+                    } catch (_: Exception) {
+                    }
                 }
-                VoiceCues.playError(activity)
+                VoiceCues.playError(app)
                 return
             }
             val db = playerConnection.database
@@ -338,13 +362,12 @@ object VoiceIntegration {
             if (songs.isEmpty()) {
                 Log.i(TAG, "voice play: no local results for '$query' (normalized '$q')")
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(
-                        activity,
-                        activity.getString(R.string.voice_song_not_found, query),
-                        Toast.LENGTH_LONG,
-                    ).show()
+                    try {
+                        Toast.makeText(app, app.getString(R.string.voice_song_not_found, query), Toast.LENGTH_LONG).show()
+                    } catch (_: Exception) {
+                    }
                 }
-                VoiceCues.playError(activity)
+                VoiceCues.playError(app)
                 return
             }
             // Match found: OK cue first, then execute (user hears
@@ -354,19 +377,24 @@ object VoiceIntegration {
             val ordered = if (isArtistIntent) songs.shuffled() else songs
             val items = ordered.map { it.toMediaMetadata() }
             withContext(Dispatchers.Main) {
-                VoiceCues.playOk(activity)
-                playerConnection.playQueue(
-                    ListQueue(
-                        title = "Voice: $query",
-                        items = items,
-                        startIndex = 0,
-                    ),
-                )
+                VoiceCues.playOk(app)
+                try {
+                    playerConnection.playQueue(
+                        ListQueue(
+                            title = "Voice: $query",
+                            items = items,
+                            startIndex = 0,
+                        ),
+                    )
+                } catch (e: Exception) {
+                    Log.w(TAG, "voice play: playback failed for '$query'", e)
+                    VoiceCues.playError(app)
+                }
             }
             Log.i(TAG, "voice play: '$query' -> ${songs.size} result(s) [songHits=${songHits.size} artistHits=${artistHits.size} randomArtist=$isArtistIntent], playing ${if (isArtistIntent) "random" else "first"}")
         } catch (e: Exception) {
             Log.w(TAG, "voice play failed for '$query'", e)
-            VoiceCues.playError(activity)
+            VoiceCues.playError(app)
         }
     }
 
@@ -375,36 +403,41 @@ object VoiceIntegration {
         activity: MainActivity,
         playerConnection: PlayerConnection,
     ) {
+        val app = activity.applicationContext
         try {
-            val all = withContext(Dispatchers.IO) { playerConnection.database.allLocalSongs() }
+            val all = playerConnection.database.allLocalSongs()
             if (all.isEmpty()) {
                 Log.i(TAG, "voice random: empty library")
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(
-                        activity,
-                        activity.getString(R.string.voice_library_empty),
-                        Toast.LENGTH_LONG,
-                    ).show()
+                    try {
+                        Toast.makeText(app, app.getString(R.string.voice_library_empty), Toast.LENGTH_LONG).show()
+                    } catch (_: Exception) {
+                    }
                 }
-                VoiceCues.playError(activity)
+                VoiceCues.playError(app)
                 return
             }
             val pick = all.random()
             val items = listOf(pick.toMediaMetadata())
             withContext(Dispatchers.Main) {
-                VoiceCues.playOk(activity)
-                playerConnection.playQueue(
-                    ListQueue(
-                        title = "Random",
-                        items = items,
-                        startIndex = 0,
-                    ),
-                )
+                VoiceCues.playOk(app)
+                try {
+                    playerConnection.playQueue(
+                        ListQueue(
+                            title = "Random",
+                            items = items,
+                            startIndex = 0,
+                        ),
+                    )
+                } catch (e: Exception) {
+                    Log.w(TAG, "voice random: playback failed", e)
+                    VoiceCues.playError(app)
+                }
             }
             Log.i(TAG, "voice random -> ${pick.song.title} (${all.size} total)")
         } catch (e: Exception) {
             Log.w(TAG, "voice random failed", e)
-            VoiceCues.playError(activity)
+            VoiceCues.playError(app)
         }
     }
 }
