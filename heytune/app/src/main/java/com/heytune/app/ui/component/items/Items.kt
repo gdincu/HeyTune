@@ -10,12 +10,9 @@
 package com.heytune.app.ui.component.items
 
 
-import android.annotation.SuppressLint
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandIn
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -52,6 +49,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -363,7 +361,6 @@ fun QueueListItem(
     modifier = modifier
 )
 
-@SuppressLint("UnusedBoxWithConstraintsScope")
 @Composable
 fun ItemThumbnail(
     thumbnailUrl: String?,
@@ -376,18 +373,25 @@ fun ItemThumbnail(
     albumIndex: Int? = null,
 ) {
     val context = LocalContext.current
+    // Plain Box: the old BoxWithConstraints forced a subcomposition + extra
+    // measure for every thumbnail row with zero benefit (constraints unused).
+    // Album overlay keeps a cheap if instead of AnimatedVisibility so 1000+
+    // inactive rows don't each own an animation.
+    val artworkModel = remember(thumbnailUrl, preferredSize) {
+        if (thumbnailUrl?.startsWith("/storage") == true) {
+            LocalArtworkPath(thumbnailUrl, preferredSize, preferredSize)
+        } else {
+            thumbnailUrl
+        }
+    }
 
-    BoxWithConstraints(
+    Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
     ) {
         AsyncImage(
             imageLoader = context.imageLoader,
-            model = if (thumbnailUrl?.startsWith("/storage") == true) {
-                LocalArtworkPath(thumbnailUrl, preferredSize, preferredSize)
-            } else {
-                thumbnailUrl
-            },
+            model = artworkModel,
 //            placeholder = rememberVectorPainter(placeholderIcon),
             contentDescription = null,
             modifier = Modifier
@@ -395,54 +399,50 @@ fun ItemThumbnail(
                 .clip(shape)
         )
 
-        if (albumIndex != null) {
-            AnimatedVisibility(
-                visible = !isActive,
-                enter = fadeIn() + expandIn(expandFrom = Alignment.Center),
-                exit = shrinkOut(shrinkTowards = Alignment.Center) + fadeOut()
+        if (albumIndex != null && !isActive) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(shape)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(0.6f))
             ) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(shape)
-                        .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(0.6f))
-                ) {
-                    Box {
-                        Text(
-                            text = albumIndex.toString(),
-                            color = MaterialTheme.colorScheme.surface,
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                drawStyle = Stroke(
-                                    miter = 10f,
-                                    width = 8f,
-                                    join = StrokeJoin.Round
-                                )
-                            ),
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Text(
-                            text = albumIndex.toString(),
-                            color = MaterialTheme.colorScheme.onSurface,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    }
+                Box {
+                    Text(
+                        text = albumIndex.toString(),
+                        color = MaterialTheme.colorScheme.surface,
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            drawStyle = Stroke(
+                                miter = 10f,
+                                width = 8f,
+                                join = StrokeJoin.Round
+                            )
+                        ),
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        text = albumIndex.toString(),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                    )
                 }
             }
         }
 
-        PlayingIndicatorBox(
-            isActive = isActive,
-            playWhenReady = isPlaying,
-            color = Color.White,
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    color = Color.Black.copy(alpha = ActiveBoxAlpha),
-                    shape = shape
-                )
-        )
+        if (isActive) {
+            PlayingIndicatorBox(
+                isActive = true,
+                playWhenReady = isPlaying,
+                color = Color.White,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        color = Color.Black.copy(alpha = ActiveBoxAlpha),
+                        shape = shape
+                    )
+            )
+        }
     }
 }
 

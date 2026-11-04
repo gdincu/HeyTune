@@ -18,7 +18,6 @@ import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -45,7 +44,9 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -123,9 +124,16 @@ fun SwipeActionBox(
     if (!enabled) {
         Box { content() }
     } else {
-        BoxWithConstraints() {
+        // NOTE: this used to be BoxWithConstraints to read maxWidth. That forces
+        // a subcomposition + extra measure pass for EVERY row, which is a major
+        // scroll cost on long song lists. Screen width from configuration is
+        // equivalent here and costs nothing per row.
+        Box {
             val haptic = LocalHapticFeedback.current
             val coroutineScope = rememberCoroutineScope()
+            val density = LocalDensity.current
+            val screenWidthDp = LocalConfiguration.current.screenWidthDp.dp
+            val screenWidthPx = with(density) { screenWidthDp.toPx() }
 
             val defaultActionSize = 150.dp
             // determines how close the second action will come in behind the first action. Higher values == closer
@@ -133,11 +141,10 @@ fun SwipeActionBox(
 
             val swipeOffset = remember { mutableFloatStateOf(0f) }
             val progress = remember { mutableIntStateOf(0) } // swipeOffset but to track haptics and opacity
-            val screenWidth = maxWidth
-            val firstThreshold = (screenWidth * 0.4f).value
-            val secondThreshold = (screenWidth * 0.8f).value
+            val firstThreshold = screenWidthPx * 0.4f
+            val secondThreshold = screenWidthPx * 0.8f
             val draggableState = rememberDraggableState { delta ->
-                swipeOffset.floatValue = (swipeOffset.floatValue + delta).coerceIn(0f, screenWidth.value)
+                swipeOffset.floatValue = (swipeOffset.floatValue + delta).coerceIn(0f, screenWidthPx)
             }
 
             Box(
@@ -200,7 +207,7 @@ fun SwipeActionBox(
                             .fillMaxHeight()
                             .align(Alignment.CenterStart)
                             .offset {
-                                IntOffset((-screenWidth.value + swipeOffset.floatValue).roundToInt(), 0)
+                                IntOffset((-screenWidthPx + swipeOffset.floatValue).roundToInt(), 0)
                             }
                     )
 
@@ -215,7 +222,7 @@ fun SwipeActionBox(
                                 .fillMaxHeight()
                                 .align(Alignment.CenterStart)
                                 .offset {
-                                    val x = -screenWidth.value + swipeOffset.floatValue
+                                    val x = -screenWidthPx + swipeOffset.floatValue
                                     val size = defaultActionSize.value
                                     // x-\frac{x^{2}}{k}-\left(0.9s\right)
                                     // x = firstAction offset, k = tightnessFactor, s = size

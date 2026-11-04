@@ -103,14 +103,22 @@ fun SongListItem(
     val haptic = LocalHapticFeedback.current
     val playerConnection = LocalPlayerConnection.current ?: return
 
+    // Built eagerly before, this ran on EVERY recomposition of EVERY row
+    // (e.g. a single play/pause toggle rebuilt thousands of MediaItems, each
+    // doing 2x artists.joinToString + MediaItem.Builder). Remember per song.
+    val mediaItem = remember(song) { song.toMediaItem() }
+    val subtitle = remember(song) {
+        joinByBullet(
+            (if (BuildConfig.DEBUG) song.song.id else ""),
+            song.artists.joinToString { it.name },
+            makeTimeString(song.song.duration * 1000L)
+        )
+    }
+
     val listItem: @Composable () -> Unit = {
         ListItem(
             title = song.song.title,
-            subtitle = joinByBullet(
-                (if (BuildConfig.DEBUG) song.song.id else ""),
-                song.artists.joinToString { it.name },
-                makeTimeString(song.song.duration * 1000L)
-            ),
+            subtitle = subtitle,
             badges = {
                 if (showLikedIcon && song.song.liked) {
                     Icon.Favorite()
@@ -205,7 +213,7 @@ fun SongListItem(
     }
 
     SwipeToQueueBox(
-        item = song.toMediaItem(),
+        item = mediaItem,
         content = { listItem() },
         snackbarHostState = snackbarHostState,
         swipeEnabled = swipeEnabled

@@ -1,7 +1,6 @@
 package com.heytune.app.ui.screens.library
 
 import android.content.pm.PackageManager
-import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -32,6 +31,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -93,7 +93,6 @@ fun LibrarySongsScreen(
     viewModel: LibrarySongsViewModel = hiltViewModel(),
     libraryFilterContent: @Composable (() -> Unit)? = null
 ) {
-    Log.v("LibrarySongsScreen", "S_RC-1")
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val density = LocalDensity.current
@@ -128,9 +127,18 @@ fun LibrarySongsScreen(
         BackHandler(onBack = onExitSelectionMode)
     }
 
+    // O(1) lookup for scroll-time isSelected checks. Building the set is O(M)
+    // once per selection change instead of O(M) per visible row per compose.
+    // SnapshotStateList.contains() is a linear scan, so with "select all" on a
+    // large library every new row composed while scrolling paid O(M).
+    val selectionSet by remember {
+        derivedStateOf { selection.toHashSet() }
+    }
+
     LaunchedEffect(songs) {
+        val songIds = songs?.let { HashSet<String>(it.size).also { set -> it.forEach { s -> set.add(s.id) } } }
         selection.fastForEachReversed { songId ->
-            if (songs?.find { it.id == songId } == null) {
+            if (songIds == null || !songIds.contains(songId)) {
                 selection.remove(songId)
             }
         }
@@ -297,25 +305,33 @@ fun LibrarySongsScreen(
                         EmptyPlaceholder(
                             icon = Icons.Rounded.MusicNote,
                             text = stringResource(R.string.library_song_empty),
-                            modifier = Modifier.animateItem()
                         )
                     }
                 }
                 val thumbnailSize = (ListThumbnailSize.value * density.density).roundToInt()
+                // Snapshot of the active id so inactive rows keep referential-stable
+                // params (see isPlayingActive below) and skip recomposition.
+                val activeId = mediaMetadata?.id
                 itemsIndexed(
                     items = songs,
                     key = { _, item -> item.id },
                     contentType = { _, _ -> CONTENT_TYPE_SONG }
                 ) { index, song ->
+                    val isActive = song.song.id == activeId
+                    // Gate isPlaying behind isActive: previously every row received
+                    // the raw isPlaying flag, so each play/pause toggle changed the
+                    // param of ALL rows and recomposed the whole visible list
+                    // (rebuilding MediaItems, re-joining subtitles, etc.).
+                    val isPlayingActive = isPlaying && isActive
                     SongListItem(
                         song = song,
                         navController = navController,
                         snackbarHostState = snackbarHostState,
 
-                        isActive = song.song.id == mediaMetadata?.id,
-                        isPlaying = isPlaying,
+                        isActive = isActive,
+                        isPlaying = isPlayingActive,
                         inSelectMode = inSelectMode,
-                        isSelected = selection.contains(song.id),
+                        isSelected = selectionSet.contains(song.id),
                         onSelectedChange = {
                             inSelectMode = true
                             if (it) {
@@ -338,7 +354,6 @@ fun LibrarySongsScreen(
                         },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .animateItem()
                     )
                 }
             }
@@ -349,10 +364,13 @@ fun LibrarySongsScreen(
 
         FloatingFooter(visible = inSelectMode && songs != null) {
             val s: List<Song> = (songs as Iterable<Song>).toList()
+            // Index once: the old selection.mapNotNull { s.find { ... } } was
+            // O(selected * total) on every recomposition while in select mode.
+            val songById = remember(songs) { songs.associateBy { it.id } }
             SelectHeader(
                 navController = navController,
                 selectedItems = selection.mapNotNull { songId ->
-                    s.find { it.id == songId }
+                    songById[songId]
                 }.map { it.toMediaMetadata() },
                 totalItemCount = s.size,
                 onSelectAll = {
