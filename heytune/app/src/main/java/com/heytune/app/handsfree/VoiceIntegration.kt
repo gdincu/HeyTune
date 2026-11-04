@@ -294,6 +294,13 @@ object VoiceIntegration {
             onDone(false)
             return
         }
+        // Success: both stores agree ON. DataStore is the source of truth
+        // for the toggle UI + auto-arm gate; the module pref gates
+        // VoiceService. (The permission-pending path reverts DataStore to
+        // false, so it must be restored here on the grant retry.)
+        withContext(Dispatchers.IO) {
+            activity.dataStore.edit { it[VoiceDrivingModeKey] = true }
+        }
         VoiceSettings.load(activity).copy(enabled = true).save(activity)
         val intent = Intent(activity, VoiceService::class.java)
             .setAction(VoiceService.ACTION_START)
