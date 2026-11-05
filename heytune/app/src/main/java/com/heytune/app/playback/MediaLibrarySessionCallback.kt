@@ -669,11 +669,15 @@ class MediaLibrarySessionCallback @Inject constructor(
         return items.subList(from, minOf(from + pageSize, items.size))
     }
 
+    // NOTE: artwork intentionally never attached (no setArtworkUri). Artwork
+    // bitmaps cross the Binder to Android Auto and large/unreadable local
+    // art blows the transaction limit and drops the connection. The iconUri
+    // plumbing is kept so call sites don't churn; it is deliberately unused.
     private fun browsableMediaItem(
         id: String,
         title: String,
         subtitle: String?,
-        iconUri: Uri?,
+        @Suppress("UNUSED_PARAMETER") iconUri: Uri?,
         mediaType: Int = MediaMetadata.MEDIA_TYPE_MUSIC
     ) =
         MediaItem.Builder()
@@ -683,7 +687,6 @@ class MediaLibrarySessionCallback @Inject constructor(
                     .setTitle(title)
                     .setSubtitle(subtitle)
                     .setArtist(subtitle)
-                    .setArtworkUri(iconUri)
                     .setIsPlayable(false)
                     .setIsBrowsable(true)
                     .setMediaType(mediaType)
@@ -691,6 +694,8 @@ class MediaLibrarySessionCallback @Inject constructor(
             )
             .build()
 
+    // NOTE: no setArtworkUri — see browsableMediaItem note. Titles/artists
+    // carry the Auto UI; artwork bitmaps over Binder caused disconnects.
     private fun Song.toMediaItem(path: String, isPlayable: Boolean = true, isBrowsable: Boolean = false) =
         MediaItem.Builder()
             .setMediaId("$path/$id")
@@ -699,7 +704,6 @@ class MediaLibrarySessionCallback @Inject constructor(
                     .setTitle(song.title)
                     .setSubtitle(artists.joinToString { it.name })
                     .setArtist(artists.joinToString { it.name })
-                    .setArtworkUri(song.thumbnailUrl?.toUri())
                     .setIsPlayable(isPlayable)
                     .setIsBrowsable(isBrowsable)
                     .setMediaType(MEDIA_TYPE_MUSIC)
@@ -717,7 +721,6 @@ class MediaLibrarySessionCallback @Inject constructor(
                 .setTitle(title)
                 .setSubtitle(artists.joinToString { it.name })
                 .setArtist(artists.joinToString { it.name })
-                .setArtworkUri(thumbnailUrl?.toUri())
                 .setAlbumTitle(album?.title)
                 .setIsPlayable(isPlayable)
                 .setIsBrowsable(isBrowsable)

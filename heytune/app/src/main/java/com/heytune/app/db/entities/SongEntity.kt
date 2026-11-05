@@ -5,7 +5,7 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
-import com.heytune.app.utils.LocalArtworkPath
+import com.heytune.app.R
 import org.apache.commons.lang3.RandomStringUtils
 import java.time.LocalDateTime
 import java.time.Month
@@ -88,8 +88,9 @@ data class SongEntity(
      */
     fun getDateModifiedLong(): Long? = dateModified?.toEpochSecond(ZoneOffset.UTC)
 
-    fun getThumbnailModel(sizeX: Int = -1, sizeY: Int = -1): Any? {
-        return LocalArtworkPath(thumbnailUrl ?: localPath, sizeX, sizeY)
+    // Artwork disabled app-wide: generic icon only (see Utils.getThumbnailModel).
+    fun getThumbnailModel(sizeX: Int = -1, sizeY: Int = -1): Any {
+        return R.drawable.placeholder_icon
     }
 
     companion object {

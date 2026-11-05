@@ -14,10 +14,8 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.drawable.Drawable
-import android.media.MediaMetadataRetriever
 import android.net.Uri
 import androidx.core.content.ContextCompat
-import androidx.core.graphics.scale
 import androidx.media3.common.util.BitmapLoader
 import coil3.ImageLoader
 import coil3.asImage
@@ -25,19 +23,12 @@ import coil3.decode.DataSource
 import coil3.fetch.FetchResult
 import coil3.fetch.Fetcher
 import coil3.fetch.ImageFetchResult
-import coil3.imageLoader
 import coil3.key.Keyer
-import coil3.request.CachePolicy
-import coil3.request.ErrorResult
-import coil3.request.ImageRequest
 import coil3.request.Options
-import coil3.request.allowHardware
-import coil3.toBitmap
 import com.heytune.app.R
 import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.guava.future
-import java.util.concurrent.ExecutionException
 import javax.inject.Inject
 import kotlin.math.min
 
@@ -51,134 +42,62 @@ class CoilBitmapLoader @Inject constructor(
         return mimeType.startsWith("image/")
     }
 
+    // Artwork is disabled app-wide (large local art over Binder dropped the
+    // Android Auto connection). The session/notification loader therefore
+    // returns only a tiny generic icon — never touches storage, decoders,
+    // or the network, and can never exceed Binder limits. The `data`
+    // overload is kept only to satisfy the Fetcher/BitmapLoader contracts.
     override fun decodeBitmap(data: ByteArray): ListenableFuture<Bitmap> =
         scope.future {
-            BitmapFactory.decodeByteArray(data, 0, data.size) ?: drawPlaceholder(context)
+            decodeSmall(data) ?: drawPlaceholder(context, SMALL_ART, SMALL_ART)
         }
 
     override fun loadBitmap(uri: Uri): ListenableFuture<Bitmap> =
         scope.future {
-            try {
-                // local images
-                val result = if (uri.toString().startsWith("/storage/")) {
-                    context.imageLoader.execute(
-                        ImageRequest.Builder(context)
-                            .data(LocalArtworkPath(uri.toString()))
-                            .allowHardware(false)
-                            .diskCachePolicy(CachePolicy.DISABLED)
-                            .build()
-                    )
-                } else {
-                    context.imageLoader.execute(
-                        ImageRequest.Builder(context)
-                            .data(uri)
-                            .allowHardware(false)
-                            .build()
-                    )
-                }
-                if (result is ErrorResult) {
-                    reportException(ExecutionException(result.throwable))
-                    return@future drawPlaceholder(context)
-                }
-
-                result.image!!.toBitmap()
-            } catch (e: Exception) {
-                reportException(ExecutionException(e))
-                return@future drawPlaceholder(context)
-            }
+            drawPlaceholder(context, SMALL_ART, SMALL_ART)
         }
 
-    override suspend fun fetch(): FetchResult? {
-        // Draw missing-art placeholders at the requested size, not the
-        // 2000px default: a full 2000x2000 ARGB bitmap is 16 MB, and
-        // allocating one per art-less row while scrolling caused GC storms.
-        val targetX = data.x.takeIf { it > 0 } ?: 256
-        val targetY = data.y.takeIf { it > 0 } ?: 256
-        return try {
-            if (data.path?.startsWith("/storage/") == true) {
-                val mData = MediaMetadataRetriever()
-                var image: Bitmap = try {
-                    try {
-                        mData.setDataSource(data.path)
-                        mData.embeddedPicture?.let { art ->
-                            // Downsample at decode time: a ~1400px embedded
-                            // cover decoded in full is ~8 MB of transient
-                            // garbage per row before being scaled to a ~144px
-                            // thumb. Sampling first cuts that ~16x.
-                            val bounds = BitmapFactory.Options().apply {
-                                inJustDecodeBounds = true
-                            }
-                            BitmapFactory.decodeByteArray(art, 0, art.size, bounds)
-                            var sample = 1
-                            val target = maxOf(targetX, targetY).coerceAtLeast(1)
-                            var w = bounds.outWidth
-                            var h = bounds.outHeight
-                            while (w / 2 >= target && h / 2 >= target && w > 0 && h > 0) {
-                                w /= 2
-                                h /= 2
-                                sample *= 2
-                            }
-                            val opts = BitmapFactory.Options().apply {
-                                inSampleSize = sample
-                            }
-                            BitmapFactory.decodeByteArray(art, 0, art.size, opts)
-                        }
-                    } finally {
-                        // Never leak the native retriever (fds + native
-                        // memory): every row scrolling by opened one.
-                        // This leak was the main scroll slowdown.
-                        try {
-                            mData.release()
-                        } catch (_: Exception) {
-                        }
-                    }
-                } catch (e: Exception) {
-                    null
-                } ?: drawPlaceholder(context, targetX, targetY)
-
-                if (data.x + data.y > 0) {
-                    var realX = data.x
-                    var realY = data.y
-
-                    // scale maintaining aspect ratio
-                    if (image.width != image.height) {
-                        val frameW = data.x
-                        val frameH = data.y
-                        val imgW = image.width
-                        val imgH = image.height
-
-                        val scaleX = frameW.toFloat() / imgW
-                        val scaleY = frameH.toFloat() / imgH
-                        val scale = minOf(scaleX, scaleY)
-
-                        realX = (imgW * scale).toInt()
-                        realY = (imgH * scale).toInt()
-                    }
-
-                    if (image.width != realX || image.height != realY) {
-                        image = image.scale(realX, realY)
-                    }
-                }
-
-                ImageFetchResult(
-                    image = image.asImage(),
-                    isSampled = false,
-                    dataSource = DataSource.DISK
-                )
-            } else {
-                null
-            }
-        } catch (e: Exception) {
-            reportException(e)
-            ImageFetchResult(
-                image = drawPlaceholder(context, targetX, targetY).asImage(),
-                isSampled = false,
-                dataSource = DataSource.MEMORY
-            )
-        }
+    // Local-file artwork path disabled: always the tiny generic icon.
+    // (Previously this ran MediaMetadataRetriever per row/session request.)
+    override suspend fun fetch(): FetchResult {
+        val icon = drawPlaceholder(context, SMALL_ART, SMALL_ART)
+        return ImageFetchResult(
+            image = icon.asImage(),
+            isSampled = false,
+            dataSource = DataSource.MEMORY
+        )
     }
 
     companion object {
+        // Single icon size used everywhere artwork used to appear (Auto,
+        // notification, lists, player). 96px ARGB = ~37 kB: far below the
+        // ~1 MB Binder limit no matter how many items reference it.
+        const val SMALL_ART = 96
+
+        /** Decode [data] downsampled so the longest side is <= [SMALL_ART]. */
+        private fun decodeSmall(data: ByteArray): Bitmap? {
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeByteArray(data, 0, data.size, bounds)
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+            var sample = 1
+            var w = bounds.outWidth
+            var h = bounds.outHeight
+            while ((w / 2 >= SMALL_ART || h / 2 >= SMALL_ART) && w > 0 && h > 0) {
+                w /= 2
+                h /= 2
+                sample *= 2
+            }
+            if (sample > 8) sample = 8
+            return try {
+                BitmapFactory.decodeByteArray(
+                    data, 0, data.size,
+                    BitmapFactory.Options().apply { inSampleSize = sample }
+                )
+            } catch (_: Exception) {
+                null
+            }
+        }
+
         // TODO: re eval dimens after a few months
         /**
          * Draw a centered square app icon with the maximum possible size while maintaining aspect ratio.
@@ -189,7 +108,7 @@ class CoilBitmapLoader @Inject constructor(
          * @param size Percentage size of valid draw frame. Must be a value between 0.0 and 1.0. For example, 0.8
          *      means that inner frame should be 80% of the size of the final frame, and centered within that frame.
          */
-        fun drawPlaceholder(context: Context, x: Int = 2000, y: Int = 2000, size: Float = 0.8f): Bitmap {
+        fun drawPlaceholder(context: Context, x: Int = SMALL_ART, y: Int = SMALL_ART, size: Float = 0.8f): Bitmap {
             val padding = size.coerceIn(0f, 1f)
             val innerRecWidth = x * padding
             val innerRecHeight = y * padding

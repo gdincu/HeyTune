@@ -1,6 +1,5 @@
 package com.heytune.app.extensions
 
-import androidx.core.net.toUri
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata.MEDIA_TYPE_MUSIC
 import com.heytune.app.db.entities.Song
@@ -11,6 +10,11 @@ import com.heytune.app.models.toMediaMetadata
 val MediaItem.metadata: MediaMetadata?
     get() = localConfiguration?.tag as? MediaMetadata
 
+// NOTE: artwork intentionally omitted (no setArtworkUri). Artwork bitmaps
+// cross the Binder to Android Auto controllers and the notification, and
+// large/denied local art (e.g. FLAC on removable storage) blows the
+// transaction limit and drops the Auto connection. Titles/artists carry
+// the UI; a generic icon is shown instead.
 fun Song.toMediaItem() = MediaItem.Builder()
     .setMediaId(song.id)
     .setUri(song.id)
@@ -21,7 +25,6 @@ fun Song.toMediaItem() = MediaItem.Builder()
             .setTitle(song.title)
             .setSubtitle(artists.joinToString { it.name })
             .setArtist(artists.joinToString { it.name })
-            .setArtworkUri(song.thumbnailUrl?.toUri())
             .setAlbumTitle(song.albumName)
             .setMediaType(MEDIA_TYPE_MUSIC)
             .build()
@@ -38,7 +41,6 @@ fun MediaMetadata.toMediaItem() = MediaItem.Builder()
             .setTitle(title)
             .setSubtitle(artists.joinToString { it.name })
             .setArtist(artists.joinToString { it.name })
-            .setArtworkUri(thumbnailUrl?.toUri())
             .setAlbumTitle(album?.title)
             .setMediaType(MEDIA_TYPE_MUSIC)
             .build()

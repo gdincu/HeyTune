@@ -21,7 +21,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.SaverScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -30,20 +29,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.palette.graphics.Palette
-import coil3.imageLoader
-import coil3.request.ImageRequest
-import coil3.request.allowHardware
-import coil3.toBitmap
-import coil3.toUri
 import com.heytune.app.playback.PlayerConnection
-import com.heytune.app.utils.LocalArtworkPath
-import com.heytune.app.utils.coilCoroutine
 import com.google.material.color.dynamiccolor.DynamicScheme
 import com.google.material.color.hct.Hct
 import com.google.material.color.scheme.SchemeTonalSpot
 import com.google.material.color.score.Score
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.launch
 
 // TODO: support for custom accent
 val DefaultThemeColor = Color(0xFFED5564)
@@ -59,43 +49,16 @@ fun HeyTuneTheme(
     pureBlack: Boolean = false,
     content: @Composable () -> Unit,
 ) {
-    val coroutineScope = rememberCoroutineScope()
-
     var themeColor by rememberSaveable(stateSaver = ColorSaver) {
         mutableStateOf(DefaultThemeColor)
     }
 
-    LaunchedEffect(playerConnection, enableDynamicTheme, isSystemInDarkTheme) {
-        val playerConnection = playerConnection
-        if (!enableDynamicTheme || playerConnection == null) {
-            themeColor = DefaultThemeColor
-            return@LaunchedEffect
-        }
-        playerConnection.service.currentMediaMetadata.collectLatest { song ->
-            coroutineScope.launch(coilCoroutine) {
-                var ret = DefaultThemeColor
-                if (song != null) {
-                    val uri = (if (song.isLocal) song.localPath else song.thumbnailUrl)?.toUri()
-                    if (uri != null) {
-                        val model = if (uri.toString().startsWith("/storage/")) {
-                            LocalArtworkPath(uri.toString(), 100, 100)
-                        } else {
-                            uri
-                        }
-
-                        val result = context.imageLoader.execute(
-                            ImageRequest.Builder(context)
-                                .data(model)
-                                .allowHardware(false)
-                                .build()
-                        )
-
-                        ret = result.image?.toBitmap()?.extractThemeColor() ?: DefaultThemeColor
-                    }
-                }
-                themeColor = ret
-            }
-        }
+    LaunchedEffect(playerConnection, enableDynamicTheme) {
+        // Artwork disabled app-wide: no artwork-based dynamic color
+        // extraction (it decoded the current track's embedded art on every
+        // change via storage/network I/O). Always use the default color.
+        themeColor = DefaultThemeColor
+        return@LaunchedEffect
     }
 
     val colorScheme = remember(darkTheme, pureBlack, themeColor) {

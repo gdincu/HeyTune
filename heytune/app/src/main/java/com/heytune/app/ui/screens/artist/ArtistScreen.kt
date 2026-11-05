@@ -50,7 +50,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavController
-import coil3.compose.AsyncImage
 import com.heytune.app.LocalDatabase
 import com.heytune.app.LocalMenuState
 import com.heytune.app.LocalPlayerAwareWindowInsets
@@ -72,7 +71,6 @@ import com.heytune.app.ui.component.items.AlbumGridItem
 import com.heytune.app.ui.component.items.SongListItem
 import com.heytune.app.ui.menu.AlbumMenu
 import com.heytune.app.ui.utils.backToMain
-import com.heytune.app.ui.utils.fadingEdge
 import com.heytune.app.utils.rememberPreference
 import com.heytune.app.viewmodels.ArtistViewModel
 import kotlin.math.roundToInt
@@ -112,31 +110,14 @@ fun ArtistScreen(
 
     val artistHead = @Composable {
         if (libraryArtist != null) {
-            val thumbnail = libraryArtist?.artist?.thumbnailUrl
+            // Artwork disabled app-wide: header shows the artist name only.
             val artistName = libraryArtist?.artist?.name
 
             Column {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .then(
-                            if (thumbnail != null) Modifier.aspectRatio(4f / 3) else Modifier
-                        )
                 ) {
-                    if (thumbnail != null) {
-                        AsyncImage(
-                            model = thumbnail,
-                            contentDescription = null,
-                            modifier = Modifier
-                                .align(Alignment.Center)
-                                .fadingEdge(
-                                    top = WindowInsets.systemBars
-                                        .asPaddingValues()
-                                        .calculateTopPadding() + AppBarHeight,
-                                    bottom = 64.dp
-                                )
-                        )
-                    }
                     AutoResizeText(
                         text = artistName
                             ?: "Unknown",
@@ -149,16 +130,10 @@ fun ArtistScreen(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .padding(horizontal = 48.dp)
-                            .then(
-                                if (thumbnail == null) {
-                                    Modifier.padding(
-                                        top = WindowInsets.systemBars
-                                            .asPaddingValues()
-                                            .calculateTopPadding() + AppBarHeight
-                                    )
-                                } else {
-                                    Modifier
-                                }
+                            .padding(
+                                top = WindowInsets.systemBars
+                                    .asPaddingValues()
+                                    .calculateTopPadding() + AppBarHeight
                             )
                     )
                 }

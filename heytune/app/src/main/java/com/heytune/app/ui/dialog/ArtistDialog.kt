@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import coil3.compose.AsyncImage
+import com.heytune.app.R
 import com.heytune.app.constants.ListItemHeight
 import com.heytune.app.constants.ListThumbnailSize
 import com.heytune.app.db.entities.ArtistEntity
@@ -98,7 +99,8 @@ fun ArtistDialog(
                     contentAlignment = Alignment.Center
                 ) {
                     AsyncImage(
-                        model = artist.thumbnailUrl,
+                        // Artwork disabled app-wide: generic icon only.
+                        model = R.drawable.placeholder_icon,
                         contentDescription = null,
                         modifier = Modifier
                             .size(ListThumbnailSize)

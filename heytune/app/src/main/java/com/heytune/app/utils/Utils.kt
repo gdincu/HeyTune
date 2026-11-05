@@ -10,6 +10,7 @@ package com.heytune.app.utils
 
 import androidx.compose.ui.util.fastAny
 import androidx.media3.exoplayer.offline.Download
+import com.heytune.app.R
 import com.heytune.app.constants.MAX_COIL_JOBS
 import com.heytune.app.constants.MAX_DL_JOBS
 import com.heytune.app.constants.MAX_LM_SCANNER_JOBS
@@ -79,10 +80,8 @@ fun getDownloadState(localDateTimes: List<LocalDateTime?>): Int {
     }
 }
 
-fun getThumbnailModel(thumbnailUrl: String, sizeX: Int = -1, sizeY: Int = -1): Any? {
-    return if (thumbnailUrl.startsWith("/storage/")) {
-        LocalArtworkPath(thumbnailUrl, sizeX, sizeY)
-    } else {
-        thumbnailUrl
-    }
+// Artwork is disabled app-wide: always return the tiny bundled generic
+// icon. This avoids all storage/network artwork I/O in lists and player.
+fun getThumbnailModel(thumbnailUrl: String, sizeX: Int = -1, sizeY: Int = -1): Any {
+    return R.drawable.placeholder_icon
 }

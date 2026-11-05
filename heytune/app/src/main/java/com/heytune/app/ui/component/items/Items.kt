@@ -49,7 +49,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -59,7 +58,6 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -69,8 +67,6 @@ import androidx.compose.ui.unit.dp
 import androidx.media3.exoplayer.offline.Download.STATE_COMPLETED
 import androidx.media3.exoplayer.offline.Download.STATE_DOWNLOADING
 import androidx.media3.exoplayer.offline.Download.STATE_QUEUED
-import coil3.compose.AsyncImage
-import coil3.imageLoader
 import com.heytune.app.LocalDownloadUtil
 import com.heytune.app.R
 import com.heytune.app.constants.GridThumbnailHeight
@@ -81,7 +77,6 @@ import com.heytune.app.db.entities.PlaylistEntity
 import com.heytune.app.models.MediaMetadata
 import com.heytune.app.models.MultiQueueObject
 import com.heytune.app.ui.component.PlayingIndicatorBox
-import com.heytune.app.utils.LocalArtworkPath
 import com.heytune.app.utils.getDownloadState
 import com.heytune.app.utils.joinByBullet
 import com.heytune.app.utils.makeTimeString
@@ -372,38 +367,21 @@ fun ItemThumbnail(
     modifier: Modifier = Modifier,
     albumIndex: Int? = null,
 ) {
-    val context = LocalContext.current
-    // Plain Box: the old BoxWithConstraints forced a subcomposition + extra
-    // measure for every thumbnail row with zero benefit (constraints unused).
-    // Album overlay keeps a cheap if instead of AnimatedVisibility so 1000+
-    // inactive rows don't each own an animation.
-    // crossfade(false): list thumbs must appear instantly like Files'
-    // RecyclerView binds — crossfade keeps 2 bitmaps alive + animates alpha
-    // on every row bind during fling.
-    val artworkModel = remember(context, thumbnailUrl, preferredSize) {
-        val raw = if (thumbnailUrl?.startsWith("/storage") == true) {
-            LocalArtworkPath(thumbnailUrl, preferredSize, preferredSize)
-        } else {
-            thumbnailUrl
-        }
-        coil3.request.ImageRequest.Builder(context)
-            .data(raw)
-            .crossfade(false)
-            .build()
-    }
-
+    // Artwork disabled app-wide: static generic icon, zero async work.
+    // (Previously each row decoded embedded art via MediaMetadataRetriever.)
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
     ) {
-        AsyncImage(
-            imageLoader = context.imageLoader,
-            model = artworkModel,
-//            placeholder = rememberVectorPainter(placeholderIcon),
+        Icon(
+            imageVector = placeholderIcon,
             contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier
                 .fillMaxSize()
                 .clip(shape)
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                .padding(8.dp)
         )
 
         if (albumIndex != null && !isActive) {

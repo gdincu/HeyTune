@@ -79,7 +79,8 @@ fun SongTagEntity.toMediaItem(): MediaItem {
                 .setRecordingMonth(recordingMonth)
                 .setAlbumTitle(albumTitle)
                 .setAlbumArtist(albumArtist)
-                .setArtworkUri(artworkUri?.toUri())
+                // NOTE: no artwork (see MediaLibrarySessionCallback) — keeps
+                // legacy MediaItems free of Binder-busting bitmaps too.
                 .setTrackNumber(trackNumber)
                 .setDiscNumber(discNumber)
                 .setRecordingYear(recordingYear)

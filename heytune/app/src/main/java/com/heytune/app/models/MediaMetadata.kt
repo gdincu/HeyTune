@@ -1,9 +1,9 @@
 package com.heytune.app.models
 
 import androidx.compose.runtime.Immutable
+import com.heytune.app.R
 import com.heytune.app.db.entities.Song
 import com.heytune.app.db.entities.SongEntity
-import com.heytune.app.utils.LocalArtworkPath
 import java.io.Serializable
 import java.time.LocalDateTime
 import java.time.ZoneOffset
@@ -94,8 +94,9 @@ data class MediaMetadata(
      */
     fun getDateModifiedLong(): Long? = dateModified?.toEpochSecond(ZoneOffset.UTC)
 
-    fun getThumbnailModel(sizeX: Int = -1, sizeY: Int = -1): Any? {
-        return LocalArtworkPath(thumbnailUrl ?: localPath, sizeX, sizeY)
+    // Artwork disabled app-wide: generic icon only (see Utils.getThumbnailModel).
+    fun getThumbnailModel(sizeX: Int = -1, sizeY: Int = -1): Any {
+        return R.drawable.placeholder_icon
     }
 }
 

@@ -21,6 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import com.heytune.app.R
 import com.heytune.app.constants.ListThumbnailSize
 import com.heytune.app.db.entities.Artist
 import com.heytune.app.ui.utils.getNSongsString
@@ -52,7 +53,8 @@ fun ArtistListItem(
     badges = badges,
     thumbnailContent = {
         AsyncImage(
-            model = artist.artist.thumbnailUrl,
+            // Artwork disabled app-wide: generic icon only.
+            model = R.drawable.placeholder_icon,
             contentDescription = null,
             modifier = Modifier
                 .size(ListThumbnailSize)
@@ -91,7 +93,8 @@ fun ArtistGridItem(
     badges = badges,
     thumbnailContent = {
         AsyncImage(
-            model = artist.artist.thumbnailUrl,
+            // Artwork disabled app-wide: generic icon only.
+            model = R.drawable.placeholder_icon,
             contentDescription = null,
             contentScale = ContentScale.Companion.Crop,
             modifier = Modifier

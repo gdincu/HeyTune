@@ -448,7 +448,8 @@ fun HomeScreen(
                                         ThumbnailCornerRadius
                                     )
                                 AsyncImage(
-                                    model = thumbnailUrl,
+                                    // Artwork disabled app-wide: generic icon only.
+                                    model = R.drawable.placeholder_icon,
                                     contentDescription = null,
                                     modifier = Modifier
                                         .size(ListThumbnailSize)

@@ -64,7 +64,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.fastForEachIndexed
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavController
-import coil3.compose.AsyncImage
 import com.heytune.app.LocalDatabase
 import com.heytune.app.LocalMenuState
 import com.heytune.app.LocalPlayerAwareWindowInsets
@@ -94,7 +93,6 @@ import com.heytune.app.ui.component.shimmer.TextPlaceholder
 import com.heytune.app.ui.menu.AlbumMenu
 import com.heytune.app.ui.utils.backToMain
 import com.heytune.app.ui.utils.getNSongsString
-import com.heytune.app.utils.LocalArtworkPath
 import com.heytune.app.utils.joinByBullet
 import com.heytune.app.utils.rememberPreference
 import com.heytune.app.viewmodels.AlbumViewModel
@@ -156,30 +154,14 @@ fun AlbumScreen(
                     Row(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        val thumbnailUrl = albumWithSongsLocal.album.thumbnailUrl
-                        if (thumbnailUrl != null) {
-                            val px = (AlbumThumbnailSize.value * density.density).roundToInt()
-                            AsyncImage(
-                                model = if (thumbnailUrl.startsWith("/storage")) LocalArtworkPath(
-                                    thumbnailUrl,
-                                    px,
-                                    px
-                                ) else thumbnailUrl,
-                                contentDescription = null,
-                                modifier = Modifier
-                                    .size(AlbumThumbnailSize)
-                                    .clip(RoundedCornerShape(ThumbnailCornerRadius))
-                            )
-                        } else {
-                            // TODO: use painter fallback
-                            AsyncImageLocal(
-                                image = { null },
-                                placeholderIcon = Icons.Rounded.Album,
-                                modifier = Modifier
-                                    .size(AlbumThumbnailSize)
-                                    .clip(RoundedCornerShape(ThumbnailCornerRadius))
-                            )
-                        }
+                        // Artwork disabled app-wide: generic icon only.
+                        AsyncImageLocal(
+                            image = { null },
+                            placeholderIcon = Icons.Rounded.Album,
+                            modifier = Modifier
+                                .size(AlbumThumbnailSize)
+                                .clip(RoundedCornerShape(ThumbnailCornerRadius))
+                        )
 
                         Spacer(Modifier.width(16.dp))
 
