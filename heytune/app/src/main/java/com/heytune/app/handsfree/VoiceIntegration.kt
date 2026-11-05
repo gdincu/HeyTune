@@ -60,6 +60,11 @@ object VoiceIntegration {
     private var pendingStart = false
     private var pendingListenOnce = false
 
+    // Fast-path gate so every pause/play tap doesn't hit DataStore + startService
+    // when driving mode is off (the logcat spam seen on moto g32).
+    @Volatile
+    private var cachedDrivingMode: Boolean? = null
+
     fun attach(activity: MainActivity) {
         micPermissionLauncher = activity.registerForActivityResult(
             ActivityResultContracts.RequestPermission(),
@@ -112,7 +117,9 @@ object VoiceIntegration {
         }
         VoiceService.playerBridge = bridge
         activity.lifecycleScope.launch {
-            if (isDrivingMode(activity)) startVoice(activity) {}
+            val driving = isDrivingMode(activity)
+            cachedDrivingMode = driving
+            if (driving) startVoice(activity) {}
         }
     }
 
@@ -134,6 +141,7 @@ object VoiceIntegration {
         onProgress: (fraction: Float) -> Unit = {},
         onDone: (ok: Boolean) -> Unit = {},
     ) {
+        cachedDrivingMode = if (enabled) null else false
         activity.lifecycleScope.launch {
             withContext(Dispatchers.IO) {
                 activity.dataStore.edit {
@@ -191,6 +199,7 @@ object VoiceIntegration {
      * Safe to call when nothing is listening — it is a no-op then.
      */
     fun cancelListen(activity: MainActivity) {
+        if (!VoiceService.isListening.value) return
         Log.i(TAG, "cancelListen")
         activity.startService(
             Intent(activity, VoiceService::class.java)
@@ -206,9 +215,15 @@ object VoiceIntegration {
      * driving-mode setting.
      */
     fun listenOnce(activity: MainActivity) {
+        // Synchronous cheap gates: window already open, or we already know
+        // driving mode is off. Avoids a DataStore read + coroutine per tap.
+        if (VoiceService.isListening.value) return
+        if (cachedDrivingMode == false) return
         Log.i(TAG, "listenOnce")
         activity.lifecycleScope.launch {
-            if (!isDrivingMode(activity)) {
+            val driving = isDrivingMode(activity)
+            cachedDrivingMode = driving
+            if (!driving) {
                 Log.i(TAG, "listenOnce: ignored (driving mode off)")
                 pendingListenOnce = false
                 return@launch
@@ -302,6 +317,7 @@ object VoiceIntegration {
             activity.dataStore.edit { it[VoiceDrivingModeKey] = true }
         }
         VoiceSettings.load(activity).copy(enabled = true).save(activity)
+        cachedDrivingMode = true
         val intent = Intent(activity, VoiceService::class.java)
             .setAction(VoiceService.ACTION_START)
         if (Build.VERSION.SDK_INT >= 26) {
@@ -320,6 +336,7 @@ object VoiceIntegration {
     }
 
     private fun stopVoice(activity: MainActivity) {
+        cachedDrivingMode = false
         // VoiceService clears its running state itself on ACTION_STOP.
         activity.startService(
             Intent(activity, VoiceService::class.java)

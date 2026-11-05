@@ -313,6 +313,7 @@ fun HomeScreen(
                 }
 
                 item {
+                    val queueTitle = stringResource(R.string.quick_picks)
                     LazyHorizontalGrid(
                         state = quickPicksLazyGridState,
                         rows = GridCells.Fixed(4),
@@ -325,10 +326,10 @@ fun HomeScreen(
                             .height(ListItemHeight * 4)
                             .animateItem()
                     ) {
-                        items(
+                        itemsIndexed(
                             items = quickPicks,
-                            key = { it.id }
-                        ) { originalSong ->
+                            key = { _, song -> song.id }
+                        ) { index, originalSong ->
                             SongListItem(
                                 song = originalSong,
                                 navController = navController,
@@ -342,8 +343,13 @@ fun HomeScreen(
 
                                 thumbnailSize = listThumbnailSize,
                                 onPlay = {
-                                    // TODO: local library quick picks playback
-
+                                    playerConnection.playQueue(
+                                        ListQueue(
+                                            title = queueTitle,
+                                            items = quickPicks.map { it.toMediaMetadata() },
+                                            startIndex = index
+                                        )
+                                    )
                                 },
                                 modifier = Modifier.width(horizontalLazyGridItemWidth)
                             )

@@ -171,9 +171,6 @@ fun BottomSheetPlayer(
     navController: NavController,
     modifier: Modifier = Modifier,
 ) {
-    val TAG = "BottomSheetPlayer"
-    Log.v(TAG, "PLR-1")
-
     val context = LocalContext.current
     val currentView = LocalView.current
     val playerConnection = LocalPlayerConnection.current ?: return
@@ -198,10 +195,13 @@ fun BottomSheetPlayer(
 
     val qbInit by playerConnection.service.qbInit.collectAsState()
 
-    LaunchedEffect(qbInit, queueBoard.masterQueues.toList()) {
-        Log.d(TAG, "Queues changed. qbInit = $qbInit")
+    val queueSnapshotKey = remember(queueBoard.masterQueues.size, qbInit) {
+        queueBoard.masterQueues.map { it.id }
+    }
+    LaunchedEffect(qbInit, queueSnapshotKey) {
+        Log.d("BottomSheetPlayer", "Queues changed. qbInit = $qbInit")
         if (qbInit && !queueBoard.masterQueues.isEmpty() && state.isDismissed) {
-            Log.d(TAG, "Triggering sheet collapseSoft")
+            Log.d("BottomSheetPlayer", "Triggering sheet collapseSoft")
             state.collapseSoft()
         }
     }
@@ -226,8 +226,6 @@ fun BottomSheetPlayer(
             MiniPlayer()
         }
     ) {
-        Log.v(TAG, "PLR-3.0")
-
         val isPlaying by playerConnection.isPlaying.collectAsState()
 
         DisposableEffect(isPlaying, keepScreenOn) {
@@ -254,9 +252,6 @@ fun PortraitPlayer(
     enableQueueSheet: Boolean = true,
     windowInsets: WindowInsets = WindowInsets.systemBars.union(WindowInsets.displayCutout),
 ) {
-    val TAG = "BottomSheetPlayer"
-    Log.v(TAG, "PLR-3.1b")
-
     val playerConnection = LocalPlayerConnection.current ?: return
 
     val dismissedBound = WindowInsets.systemBars.asPaddingValues().calculateBottomPadding()
@@ -280,7 +275,6 @@ fun PortraitPlayer(
                 .weight(1f)
                 .nestedScroll(playerSheetState.preUpPostDownNestedScrollConnection)
         ) {
-            Log.v(TAG, "PLR-3.2b")
             val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
 
 
@@ -408,8 +402,6 @@ fun LandscapePlayer(
     enableQueueSheet: Boolean = true,
     windowInsets: WindowInsets = WindowInsets.systemBars.union(WindowInsets.displayCutout)
 ) {
-    val TAG = "BottomSheetPlayer"
-
     val context = LocalContext.current
     val playerConnection = LocalPlayerConnection.current ?: return
 
@@ -467,7 +459,6 @@ fun LandscapePlayer(
                 .weight(1f)
                 .nestedScroll(playerSheetState.preUpPostDownNestedScrollConnection)
         ) {
-            Log.v(TAG, "PLR-3.1a")
             if (!swipeToSkip) {
                 Thumbnail(
                     sliderPositionProvider = { sliderPosition },
@@ -573,9 +564,6 @@ fun ActionButtons(
     playerSheetState: BottomSheetState,
     navController: NavController,
 ) {
-    val TAG = "ActionButtons()"
-    Log.v(TAG, "PLR-AB-1")
-
     val playerConnection = LocalPlayerConnection.current ?: return
     val menuState = LocalMenuState.current
 
@@ -633,6 +621,89 @@ fun ActionButtons(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+private fun PlaybackProgress(
+    playerConnection: PlayerConnection,
+    onBackgroundColor: Color,
+    modifier: Modifier = Modifier,
+) {
+    val haptic = LocalHapticFeedback.current
+    val playbackState by playerConnection.playbackState.collectAsState()
+    var duration by rememberSaveable(playbackState) {
+        mutableLongStateOf(playerConnection.player.duration)
+    }
+    var position by remember(playbackState) {
+        mutableLongStateOf(playerConnection.player.currentPosition)
+    }
+    LaunchedEffect(playbackState) {
+        // Only tick while actually playing; otherwise this recomposes
+        // ControlsContent 2x/sec forever (the 96% main-thread spin).
+        if (playbackState == STATE_READY && playerConnection.player.playWhenReady) {
+            while (isActive) {
+                delay(1000)
+                position = playerConnection.player.currentPosition
+                duration = playerConnection.player.duration
+            }
+        }
+    }
+    var sliderPosition by remember {
+        mutableStateOf<Long?>(null)
+    }
+
+    Column(modifier = modifier) {
+        Slider(
+            value = (sliderPosition ?: position).toFloat(),
+            valueRange = 0f..(if (duration == C.TIME_UNSET) 0f else duration.toFloat()),
+            onValueChange = {
+                sliderPosition = it.toLong()
+            },
+            onValueChangeFinished = {
+                sliderPosition?.let {
+                    playerConnection.player.seekTo(it)
+                    position = it
+                }
+                sliderPosition = null
+                haptic.performHapticFeedback(HapticFeedbackType.Confirm)
+            },
+            thumb = { Spacer(modifier = Modifier.size(0.dp)) },
+            track = { sliderState ->
+                PlayerSliderTrack(
+                    sliderState = sliderState,
+                    colors = SliderDefaults.colors()
+                )
+            },
+            modifier = Modifier.padding(horizontal = PlayerHorizontalPadding)
+        )
+
+        Row(
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = PlayerHorizontalPadding + 4.dp)
+        ) {
+            Text(
+                text = makeTimeString(sliderPosition ?: position),
+                style = MaterialTheme.typography.labelMedium,
+                color = onBackgroundColor,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+
+            Text(
+                text = if (duration != C.TIME_UNSET) makeTimeString(duration) else "",
+                style = MaterialTheme.typography.labelMedium,
+                color = onBackgroundColor,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+
+        Spacer(Modifier.height(12.dp))
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
 fun ControlsContent(
     playerSheetState: BottomSheetState,
     queueSheetState: BottomSheetState,
@@ -640,9 +711,6 @@ fun ControlsContent(
     queueBoard: QueueBoard,
     showQueueHint: Boolean = false,
 ) {
-    val TAG = "ControlsContent()"
-    Log.v(TAG, "PLR-CC-1")
-
     val haptic = LocalHapticFeedback.current
     val voiceActivity = LocalContext.current as? com.heytune.app.MainActivity
     val listening by com.heytune.handsfree.VoiceService.isListening.collectAsState()
@@ -694,28 +762,6 @@ fun ControlsContent(
 
 
     val playbackState by playerConnection.playbackState.collectAsState()
-    var duration by rememberSaveable(playbackState) {
-        mutableLongStateOf(playerConnection.player.duration)
-    }
-
-    var position by remember(playbackState) {
-        mutableLongStateOf(playerConnection.player.currentPosition)
-    }
-
-    LaunchedEffect(playbackState) {
-        if (playbackState == STATE_READY) {
-            while (isActive) {
-                delay(500)
-                position = playerConnection.player.currentPosition
-                duration = playerConnection.player.duration
-            }
-        }
-    }
-
-
-    var sliderPosition by remember {
-        mutableStateOf<Long?>(null)
-    }
 
     BoxWithConstraints() {
         val maxW = maxWidth
@@ -833,57 +879,10 @@ fun ControlsContent(
                 }
             }
 
-            Slider(
-                value = (sliderPosition ?: position).toFloat(),
-                valueRange = 0f..(if (duration == C.TIME_UNSET) 0f else duration.toFloat()),
-                onValueChange = {
-                    sliderPosition = it.toLong()
-                    // slider too granular for this haptic to feel right
-//                    haptic.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick)
-                },
-                onValueChangeFinished = {
-                    sliderPosition?.let {
-                        playerConnection.player.seekTo(it)
-                        position = it
-                    }
-                    sliderPosition = null
-                    haptic.performHapticFeedback(HapticFeedbackType.Confirm)
-                },
-                thumb = { Spacer(modifier = Modifier.size(0.dp)) },
-                track = { sliderState ->
-                    PlayerSliderTrack(
-                        sliderState = sliderState,
-                        colors = SliderDefaults.colors()
-                    )
-                },
-                modifier = Modifier.padding(horizontal = PlayerHorizontalPadding)
+            PlaybackProgress(
+                playerConnection = playerConnection,
+                onBackgroundColor = onBackgroundColor,
             )
-
-            Row(
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = PlayerHorizontalPadding + 4.dp)
-            ) {
-                Text(
-                    text = makeTimeString(sliderPosition ?: position),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = onBackgroundColor,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-
-                Text(
-                    text = if (duration != C.TIME_UNSET) makeTimeString(duration) else "",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = onBackgroundColor,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-
-            Spacer(Modifier.height(12.dp))
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -1080,9 +1079,6 @@ fun PlayerBackground(
     showLyrics: Boolean,
     useDarkTheme: Boolean,
 ) {
-    val TAG = "PlayerBackground"
-    Log.v(TAG, "PLR_BG-1")
-
     val context = LocalContext.current
 
     Box(
@@ -1124,14 +1120,13 @@ fun PlayerBackground(
             }
         ) { metadata ->
             if (playerBackground == PlayerBackgroundStyle.BLUR) {
-                Log.v(TAG, "PLR-2.2a")
                 AsyncImage(
                     model = metadata?.getThumbnailModel(100, 100),
                     contentDescription = null,
                     contentScale = ContentScale.FillBounds,
                     modifier = Modifier
                         .fillMaxSize()
-                        .blur(100.dp)
+                        .blur(24.dp)
                         .alpha(0.5f)
                 )
             }
@@ -1144,7 +1139,6 @@ fun PlayerBackground(
             }
         ) { colors ->
             if (playerBackground == PlayerBackgroundStyle.GRADIENT && colors.size >= 2) {
-                Log.v(TAG, "PLR-2.2b")
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -1154,7 +1148,6 @@ fun PlayerBackground(
         }
 
         if (playerBackground != PlayerBackgroundStyle.FOLLOW_THEME && showLyrics) {
-            Log.v(TAG, "PLR-2.2c")
             Box(
                 modifier = Modifier
                     .fillMaxSize()

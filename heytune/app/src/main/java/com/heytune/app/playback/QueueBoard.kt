@@ -26,15 +26,12 @@ import com.heytune.app.models.MultiQueueObject
 import com.heytune.app.utils.dataStore
 import com.heytune.app.utils.get
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import java.util.PriorityQueue
 import kotlin.math.max
 import kotlin.math.min
 
@@ -875,99 +872,102 @@ class QueueBoard(
      * ========================
      */
 
-    class PriorityJob(val priority: Int, val job: Job) : Comparable<PriorityJob> {
-        override fun compareTo(other: PriorityJob): Int = this.priority - other.priority
-    }
-
-    var queueEntity = PriorityQueue<PriorityJob>()
-    var queueSongMap = PriorityQueue<PriorityJob>()
-    var jobActive = Mutex()
+    private val saveMutex = Mutex()
+    private var debounceJob: Job? = null
+    private var pendingSongQueue: MultiQueueObject? = null
+    private var pendingEntityQueue: MultiQueueObject? = null
+    private var pendingAllQueues: List<MultiQueueObject>? = null
     val coroutineScope = CoroutineScope(Dispatchers.IO)
 
     /**
-     * Execute the most recent save request, with a 5 second delay from function call
+     * Coalescing debounced save: callers only record the latest object,
+     * a single worker waits 5s then flushes. Retries while new work arrived.
      */
-    private suspend fun databaseDispatcher() {
-        Log.d(TAG, "Starting database save task")
-        if (jobActive.isLocked) {
-            Log.d(TAG, "Database save task is already active, aborting")
-            return
-        }
-
-        jobActive.withLock {
-            while (queueEntity.isNotEmpty() || queueSongMap.isNotEmpty()) {
-                runBlocking {
-                    delay(5000L)
+    private fun scheduleSave() {
+        coroutineScope.launch {
+            var shouldLaunch = false
+            saveMutex.withLock {
+                if (debounceJob?.isActive == true) {
+                    // Already scheduled; pending vars will be picked up on flush.
+                    return@withLock
                 }
-                Log.d(TAG, "Running database save task")
-
-                // saving songs nukes the queue entity in the process, about it shouldn't matter since are same queue object
-                if (!queueSongMap.isEmpty()) {
-                    queueSongMap.last().job.start()
-                    queueSongMap.clear()
-                    continue
-                }
-
-                if (!queueEntity.isEmpty()) {
-                    queueEntity.last().job.start()
-                    queueEntity.clear()
-                    continue
-                }
+                shouldLaunch = true
+            }
+            if (!shouldLaunch) return@launch
+            val job = coroutineScope.launch {
+                delay(5000L)
+                flushPendingSaves()
+            }
+            saveMutex.withLock {
+                debounceJob = job
             }
         }
-        Log.d(TAG, "Exiting database save task")
+    }
+
+    private suspend fun flushPendingSaves() {
+        while (true) {
+            val songs: MultiQueueObject?
+            val entity: MultiQueueObject?
+            val all: List<MultiQueueObject>?
+            saveMutex.withLock {
+                songs = pendingSongQueue
+                entity = pendingEntityQueue
+                all = pendingAllQueues
+                pendingSongQueue = null
+                pendingEntityQueue = null
+                pendingAllQueues = null
+                if (songs == null && entity == null && all == null) {
+                    debounceJob = null
+                    return
+                }
+            }
+            try {
+                // saving songs rewrites the queue entity too
+                songs?.let { player.database.saveQueue(it) }
+                    ?: entity?.let { player.database.updateQueue(it) }
+                all?.let { player.database.updateAllQueues(it) }
+            } catch (e: Exception) {
+                Log.w(TAG, "Queue save failed", e)
+            }
+        }
     }
 
     fun shutdown() {
-        queueSongMap.clear()
-        queueEntity.clear()
+        coroutineScope.launch {
+            saveMutex.withLock {
+                debounceJob?.cancel()
+                debounceJob = null
+                pendingSongQueue = null
+                pendingEntityQueue = null
+                pendingAllQueues = null
+            }
+        }
     }
 
     private fun saveQueueSongs(mq: MultiQueueObject) {
         if (player.dataStore.get(PersistentQueueKey, true)) {
-            queueSongMap.add(
-                PriorityJob(
-                    0,
-                    coroutineScope.launch(start = CoroutineStart.DEFAULT) {
-                        player.database.saveQueue(mq)
-                    }
-                )
-            )
-            CoroutineScope(Dispatchers.IO).launch {
-                databaseDispatcher()
+            coroutineScope.launch {
+                saveMutex.withLock { pendingSongQueue = mq }
+                scheduleSave()
             }
         }
     }
 
     private fun saveQueue(mq: MultiQueueObject) {
         if (player.dataStore.get(PersistentQueueKey, true)) {
-            queueEntity.add(
-                PriorityJob(
-                    0,
-                    coroutineScope.launch(start = CoroutineStart.DEFAULT) {
-                        player.database.updateQueue(mq)
-                    }
-                )
-            )
-            CoroutineScope(Dispatchers.IO).launch {
-                databaseDispatcher()
+            coroutineScope.launch {
+                saveMutex.withLock { pendingEntityQueue = mq }
+                scheduleSave()
             }
         }
     }
 
     private fun saveAllQueues(mq: MutableList<MultiQueueObject>) {
         if (player.dataStore.get(PersistentQueueKey, true)) {
-            queueEntity.add(
-                // we select most recent task, therefore "lowest" numeric priority at the end of the list == "highest" priority
-                PriorityJob(
-                    -1,
-                    coroutineScope.launch(start = CoroutineStart.DEFAULT) {
-                        player.database.updateAllQueues(mq)
-                    }
-                )
-            )
-            CoroutineScope(Dispatchers.IO).launch {
-                databaseDispatcher()
+            val snapshot = ArrayList(mq)
+            coroutineScope.launch {
+                saveMutex.withLock { pendingAllQueues = snapshot }
+                scheduleSave()
             }
         }
     }
