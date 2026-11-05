@@ -93,6 +93,9 @@ fun SongListItem(
     showMenu: Boolean = true,
     showLikedIcon: Boolean = true,
     showDownloadIcon: Boolean = true,
+    // Files-style fast path: static MusicNote icon, no Coil/MMR decode.
+    // Defaults to false for scroll speed; pass true to opt into artwork.
+    showThumbnail: Boolean = false,
 
     thumbnailSize: Int,
     onPlay: () -> Unit,
@@ -105,8 +108,14 @@ fun SongListItem(
 
     // Built eagerly before, this ran on EVERY recomposition of EVERY row
     // (e.g. a single play/pause toggle rebuilt thousands of MediaItems, each
-    // doing 2x artists.joinToString + MediaItem.Builder). Remember per song.
-    val mediaItem = remember(song) { song.toMediaItem() }
+    // doing 2x artists.joinToString + MediaItem.Builder). Remember per song,
+    // and skip entirely when swipe is off — the MediaItem is only consumed
+    // by SwipeToQueueBox (enqueueNext/End), so non-swipe rows pay zero.
+    val mediaItem = if (swipeEnabled) {
+        remember(song) { song.toMediaItem() }
+    } else {
+        null
+    }
     val subtitle = remember(song) {
         joinByBullet(
             (if (BuildConfig.DEBUG) song.song.id else ""),
@@ -129,15 +138,23 @@ fun SongListItem(
                 }
             },
             thumbnailContent = {
-                ItemThumbnail(
-                    thumbnailUrl = song.song.thumbnailUrl,
-                    preferredSize = thumbnailSize,
-                    albumIndex = albumIndex,
-                    isActive = isActive,
-                    isPlaying = isPlaying,
-                    shape = RoundedCornerShape(ThumbnailCornerRadius),
-                    modifier = Modifier.size(ListThumbnailSize)
-                )
+                if (showThumbnail) {
+                    ItemThumbnail(
+                        thumbnailUrl = song.song.thumbnailUrl,
+                        preferredSize = thumbnailSize,
+                        albumIndex = albumIndex,
+                        isActive = isActive,
+                        isPlaying = isPlaying,
+                        shape = RoundedCornerShape(ThumbnailCornerRadius),
+                        modifier = Modifier.size(ListThumbnailSize)
+                    )
+                } else {
+                    StaticSongThumbnail(
+                        isActive = isActive,
+                        shape = RoundedCornerShape(ThumbnailCornerRadius),
+                        modifier = Modifier.size(ListThumbnailSize)
+                    )
+                }
             },
             trailingContent = {
                 if (inSelectMode == true) {
@@ -212,12 +229,20 @@ fun SongListItem(
         )
     }
 
-    SwipeToQueueBox(
-        item = mediaItem,
-        content = { listItem() },
-        snackbarHostState = snackbarHostState,
-        swipeEnabled = swipeEnabled
-    )
+    // Skip the swipe wrapper entirely when disabled: SwipeActionBox owns a
+    // draggable + coroutine scope + nested Boxes per row even in its cheap
+    // branch. Files' browse list has no swipe gesture competing with the
+    // vertical fling, so non-swipe rows stay a plain clickable row.
+    if (swipeEnabled && mediaItem != null) {
+        SwipeToQueueBox(
+            item = mediaItem,
+            content = { listItem() },
+            snackbarHostState = snackbarHostState,
+            swipeEnabled = true
+        )
+    } else {
+        listItem()
+    }
 }
 
 @Composable

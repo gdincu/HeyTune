@@ -89,8 +89,13 @@ fun PlayingIndicatorBox(
     playWhenReady: Boolean,
     color: Color = Color.White,
 ) {
+    // Fast-list path: inactive rows must own ZERO animation objects.
+    // Previously every row owned an AnimatedVisibility (enter/exit specs +
+    // animation clock) even when invisible — 1000+ rows each holding
+    // animation state. Return early so only the single active row composes.
+    if (!isActive) return
     AnimatedVisibility(
-        visible = isActive,
+        visible = true,
         enter = fadeIn(tween(500)),
         exit = fadeOut(tween(500))
     ) {

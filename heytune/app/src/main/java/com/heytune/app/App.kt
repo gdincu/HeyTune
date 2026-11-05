@@ -44,7 +44,7 @@ class App : Application(), SingletonImageLoader.Factory {
                 add(CoilBitmapLoader.Factory(this@App))
                 add(LocalArtworkPathKeyer())
             }
-            .crossfade(true)
+            .crossfade(false) // Files-style fast list: no fade animation per thumbnail during fling (avoids double-compose + flicker on every row bind)
             .allowHardware(false)
             .memoryCache {
                 MemoryCache.Builder()

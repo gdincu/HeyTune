@@ -377,12 +377,19 @@ fun ItemThumbnail(
     // measure for every thumbnail row with zero benefit (constraints unused).
     // Album overlay keeps a cheap if instead of AnimatedVisibility so 1000+
     // inactive rows don't each own an animation.
-    val artworkModel = remember(thumbnailUrl, preferredSize) {
-        if (thumbnailUrl?.startsWith("/storage") == true) {
+    // crossfade(false): list thumbs must appear instantly like Files'
+    // RecyclerView binds — crossfade keeps 2 bitmaps alive + animates alpha
+    // on every row bind during fling.
+    val artworkModel = remember(context, thumbnailUrl, preferredSize) {
+        val raw = if (thumbnailUrl?.startsWith("/storage") == true) {
             LocalArtworkPath(thumbnailUrl, preferredSize, preferredSize)
         } else {
             thumbnailUrl
         }
+        coil3.request.ImageRequest.Builder(context)
+            .data(raw)
+            .crossfade(false)
+            .build()
     }
 
     Box(
@@ -442,6 +449,59 @@ fun ItemThumbnail(
                         shape = shape
                     )
             )
+        }
+    }
+}
+
+/**
+ * Files-by-Google fast path: static file-type icon, zero async work.
+ *
+ * A RecyclerView file row is just a TextView + static vector drawable —
+ * no image decode, no Coil/Fetcher, no MediaMetadataRetriever, no memory-
+ * cache lookup, no crossfade. That is why a 10k-file folder flings at 120Hz
+ * while our old row decoded embedded art per bind. Use this for long song
+ * lists (Library Songs); keep [ItemThumbnail] for short lists (albums,
+ * search) where artwork matters.
+ */
+@Composable
+fun StaticSongThumbnail(
+    isActive: Boolean,
+    shape: Shape,
+    modifier: Modifier = Modifier,
+    icon: ImageVector = Icons.Rounded.MusicNote,
+) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(24.dp)
+        )
+        // Static playing affordance — no PlayingIndicator animation (which
+        // runs 3 infinite Animatable coroutines invalidating Canvas ~20fps
+        // for as long as the row is composed). The list row just needs to
+        // say "this one"; the animated bars live in player UI.
+        if (isActive) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        color = Color.Black.copy(alpha = ActiveBoxAlpha),
+                        shape = shape
+                    )
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.play),
+                    contentDescription = null,
+                    tint = Color.White
+                )
+            }
         }
     }
 }

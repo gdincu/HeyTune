@@ -326,6 +326,10 @@ fun LibrarySongsScreen(
                         song = song,
                         navController = navController,
                         snackbarHostState = snackbarHostState,
+                        // Files-style fast path: static note icon, no per-row
+                        // Coil/MMR decode. This is the longest list in the app;
+                        // artwork stays on for short lists (album/search).
+                        showThumbnail = false,
 
                         isActive = isActive,
                         isPlaying = isPlayingActive,
