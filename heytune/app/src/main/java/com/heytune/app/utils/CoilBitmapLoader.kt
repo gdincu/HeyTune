@@ -11,7 +11,6 @@ package com.heytune.app.utils
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.drawable.Drawable
 import android.net.Uri
@@ -45,11 +44,14 @@ class CoilBitmapLoader @Inject constructor(
     // Artwork is disabled app-wide (large local art over Binder dropped the
     // Android Auto connection). The session/notification loader therefore
     // returns only a tiny generic icon — never touches storage, decoders,
-    // or the network, and can never exceed Binder limits. The `data`
-    // overload is kept only to satisfy the Fetcher/BitmapLoader contracts.
+    // or the network, and can never exceed Binder limits. Both overloads
+    // ignore their input (including ExoPlayer-extracted embedded
+    // artworkData, which is why Auto still showed low-res covers after
+    // setArtworkUri was removed). The `data` overload is kept only to
+    // satisfy the Fetcher/BitmapLoader contracts.
     override fun decodeBitmap(data: ByteArray): ListenableFuture<Bitmap> =
         scope.future {
-            decodeSmall(data) ?: drawPlaceholder(context, SMALL_ART, SMALL_ART)
+            drawPlaceholder(context, SMALL_ART, SMALL_ART)
         }
 
     override fun loadBitmap(uri: Uri): ListenableFuture<Bitmap> =
@@ -73,30 +75,6 @@ class CoilBitmapLoader @Inject constructor(
         // notification, lists, player). 96px ARGB = ~37 kB: far below the
         // ~1 MB Binder limit no matter how many items reference it.
         const val SMALL_ART = 96
-
-        /** Decode [data] downsampled so the longest side is <= [SMALL_ART]. */
-        private fun decodeSmall(data: ByteArray): Bitmap? {
-            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            BitmapFactory.decodeByteArray(data, 0, data.size, bounds)
-            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-            var sample = 1
-            var w = bounds.outWidth
-            var h = bounds.outHeight
-            while ((w / 2 >= SMALL_ART || h / 2 >= SMALL_ART) && w > 0 && h > 0) {
-                w /= 2
-                h /= 2
-                sample *= 2
-            }
-            if (sample > 8) sample = 8
-            return try {
-                BitmapFactory.decodeByteArray(
-                    data, 0, data.size,
-                    BitmapFactory.Options().apply { inSampleSize = sample }
-                )
-            } catch (_: Exception) {
-                null
-            }
-        }
 
         // TODO: re eval dimens after a few months
         /**

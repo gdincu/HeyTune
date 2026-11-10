@@ -1,12 +1,9 @@
 package com.heytune.app.playback
 
-import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
-import androidx.annotation.DrawableRes
-import androidx.core.net.toUri
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
@@ -181,28 +178,28 @@ class MediaLibrarySessionCallback @Inject constructor(
                         MusicService.SONG,
                         context.getString(R.string.songs),
                         null,
-                        drawableUri(R.drawable.music_note),
+                        null,
                         MediaMetadata.MEDIA_TYPE_PLAYLIST
                     ),
                     browsableMediaItem(
                         MusicService.ARTIST,
                         context.getString(R.string.artists),
                         null,
-                        drawableUri(R.drawable.artist),
+                        null,
                         MediaMetadata.MEDIA_TYPE_FOLDER_ARTISTS
                     ),
                     browsableMediaItem(
                         MusicService.ALBUM,
                         context.getString(R.string.albums),
                         null,
-                        drawableUri(R.drawable.album),
+                        null,
                         MediaMetadata.MEDIA_TYPE_FOLDER_ALBUMS
                     ),
                     browsableMediaItem(
                         MusicService.PLAYLIST,
                         context.getString(R.string.playlists),
                         null,
-                        drawableUri(R.drawable.queue_music),
+                        null,
                         MediaMetadata.MEDIA_TYPE_FOLDER_PLAYLISTS
                     )
                 )
@@ -213,7 +210,7 @@ class MediaLibrarySessionCallback @Inject constructor(
                         "${MusicService.ARTIST}/${artist.id}",
                         artist.artist.name,
                         context.resources.getQuantityString(R.plurals.n_song, artist.songCount, artist.songCount),
-                        artist.artist.thumbnailUrl?.toUri(),
+                        null,
                         MediaMetadata.MEDIA_TYPE_ARTIST
                     )
                 }
@@ -223,7 +220,7 @@ class MediaLibrarySessionCallback @Inject constructor(
                         "${MusicService.ALBUM}/${album.id}",
                         album.album.title,
                         album.artists.joinToString { it.name },
-                        album.album.thumbnailUrl?.toUri(),
+                        null,
                         MediaMetadata.MEDIA_TYPE_ALBUM
                     )
                 }
@@ -236,7 +233,7 @@ class MediaLibrarySessionCallback @Inject constructor(
                             "${MusicService.PLAYLIST}/${PlaylistEntity.LIKED_PLAYLIST_ID}",
                             context.getString(R.string.liked_songs),
                             context.resources.getQuantityString(R.plurals.n_song, likedSongCount, likedSongCount),
-                            drawableUri(R.drawable.favorite),
+                            null,
                             MediaMetadata.MEDIA_TYPE_PLAYLIST
                         ),
                         browsableMediaItem(
@@ -247,7 +244,7 @@ class MediaLibrarySessionCallback @Inject constructor(
                                 downloadedSongCount,
                                 downloadedSongCount
                             ),
-                            drawableUri(R.drawable.download),
+                            null,
                             MediaMetadata.MEDIA_TYPE_PLAYLIST
                         )
                     ) + database.playlistInLibraryAsc().first().map { playlist ->
@@ -259,7 +256,7 @@ class MediaLibrarySessionCallback @Inject constructor(
                                 playlist.songCount,
                                 playlist.songCount
                             ),
-                            drawableUri(R.drawable.queue_music),
+                            null,
                             MediaMetadata.MEDIA_TYPE_PLAYLIST
                         )
                     }
@@ -319,7 +316,7 @@ class MediaLibrarySessionCallback @Inject constructor(
                     MusicService.SONG,
                     context.getString(R.string.songs),
                     null,
-                    drawableUri(R.drawable.music_note),
+                    null,
                     MediaMetadata.MEDIA_TYPE_PLAYLIST
                 ), null
             )
@@ -328,7 +325,7 @@ class MediaLibrarySessionCallback @Inject constructor(
                     MusicService.ARTIST,
                     context.getString(R.string.artists),
                     null,
-                    drawableUri(R.drawable.artist),
+                    null,
                     MediaMetadata.MEDIA_TYPE_FOLDER_ARTISTS
                 ), null
             )
@@ -337,7 +334,7 @@ class MediaLibrarySessionCallback @Inject constructor(
                     MusicService.ALBUM,
                     context.getString(R.string.albums),
                     null,
-                    drawableUri(R.drawable.album),
+                    null,
                     MediaMetadata.MEDIA_TYPE_FOLDER_ALBUMS
                 ), null
             )
@@ -346,7 +343,7 @@ class MediaLibrarySessionCallback @Inject constructor(
                     MusicService.PLAYLIST,
                     context.getString(R.string.playlists),
                     null,
-                    drawableUri(R.drawable.queue_music),
+                    null,
                     MediaMetadata.MEDIA_TYPE_FOLDER_PLAYLISTS
                 ), null
             )
@@ -361,7 +358,7 @@ class MediaLibrarySessionCallback @Inject constructor(
                         mediaId,
                         artist.artist.name,
                         context.resources.getQuantityString(R.plurals.n_song, artist.songCount, artist.songCount),
-                        artist.artist.thumbnailUrl?.toUri(),
+                        null,
                         MediaMetadata.MEDIA_TYPE_ARTIST
                     ), null
                 )
@@ -376,7 +373,7 @@ class MediaLibrarySessionCallback @Inject constructor(
                         mediaId,
                         album.album.title,
                         album.artists.joinToString { it.name },
-                        album.album.thumbnailUrl?.toUri(),
+                        null,
                         MediaMetadata.MEDIA_TYPE_ALBUM
                     ), null
                 )
@@ -391,7 +388,7 @@ class MediaLibrarySessionCallback @Inject constructor(
                         mediaId,
                         context.getString(R.string.liked_songs),
                         context.resources.getQuantityString(R.plurals.n_song, count, count),
-                        drawableUri(R.drawable.favorite),
+                        null,
                         MediaMetadata.MEDIA_TYPE_PLAYLIST
                     ), null
                 )
@@ -403,7 +400,7 @@ class MediaLibrarySessionCallback @Inject constructor(
                         mediaId,
                         context.getString(R.string.downloaded_songs),
                         context.resources.getQuantityString(R.plurals.n_song, count, count),
-                        drawableUri(R.drawable.download),
+                        null,
                         MediaMetadata.MEDIA_TYPE_PLAYLIST
                     ), null
                 )
@@ -419,7 +416,7 @@ class MediaLibrarySessionCallback @Inject constructor(
                             playlist.songCount,
                             playlist.songCount
                         ),
-                        drawableUri(R.drawable.queue_music),
+                        null,
                         MediaMetadata.MEDIA_TYPE_PLAYLIST
                     ), null
                 )
@@ -650,13 +647,6 @@ class MediaLibrarySessionCallback @Inject constructor(
         }
     }
 
-    private fun drawableUri(@DrawableRes id: Int) = Uri.Builder()
-        .scheme(ContentResolver.SCHEME_ANDROID_RESOURCE)
-        .authority(context.resources.getResourcePackageName(id))
-        .appendPath(context.resources.getResourceTypeName(id))
-        .appendPath(context.resources.getResourceEntryName(id))
-        .build()
-
     /**
      * Media3 paginates browse/search results via (page, pageSize). The full
      * list is built first (library queries are Flow-based), then sliced so
@@ -669,10 +659,10 @@ class MediaLibrarySessionCallback @Inject constructor(
         return items.subList(from, minOf(from + pageSize, items.size))
     }
 
-    // NOTE: artwork intentionally never attached (no setArtworkUri). Artwork
-    // bitmaps cross the Binder to Android Auto and large/unreadable local
+    // NOTE: artwork intentionally never attached (no setArtworkUri/setArtworkData).
+    // Artwork bitmaps cross the Binder to Android Auto and large/unreadable local
     // art blows the transaction limit and drops the connection. The iconUri
-    // plumbing is kept so call sites don't churn; it is deliberately unused.
+    // param is dead (always null) and kept only to avoid churning call sites.
     private fun browsableMediaItem(
         id: String,
         title: String,
