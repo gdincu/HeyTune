@@ -31,9 +31,7 @@ import androidx.compose.material.icons.rounded.Equalizer
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Lyrics
 import androidx.compose.material.icons.rounded.MoreTime
-import androidx.compose.material.icons.rounded.Radio
 import androidx.compose.material.icons.rounded.RemoveCircleOutline
-import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.SlowMotionVideo
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.Tune
@@ -80,7 +78,6 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.media3.common.PlaybackParameters
 import androidx.navigation.NavController
 import com.heytune.app.LocalDatabase
-import com.heytune.app.LocalDownloadUtil
 import com.heytune.app.LocalPlayerConnection
 import com.heytune.app.R
 import com.heytune.app.constants.ShowLyricsKey
@@ -120,7 +117,6 @@ fun PlayerMenu(
     mediaMetadata ?: return
     val context = LocalContext.current
     val database = LocalDatabase.current
-    val downloadUtil = LocalDownloadUtil.current
     val clipboardManager = LocalClipboard.current
 
     var showLyrics by rememberPreference(ShowLyricsKey, defaultValue = false)
@@ -132,8 +128,6 @@ fun PlayerMenu(
     val currentFormat = currentFormatState.value
     val librarySong by database.song(mediaMetadata.id).collectAsState(initial = null)
     val coroutineScope = rememberCoroutineScope()
-
-    val download by LocalDownloadUtil.current.getDownload(mediaMetadata.id).collectAsState(initial = null)
 
     val activityResultLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { }
 
@@ -411,15 +405,6 @@ fun PlayerMenu(
             bottom = 8.dp + WindowInsets.systemBars.asPaddingValues().calculateBottomPadding()
         )
     ) {
-        // TODO: local library radio playback
-        if (!mediaMetadata.isLocal)
-            GridMenuItem(
-                icon = Icons.Rounded.Radio,
-                title = R.string.start_radio
-            ) {
-//                playerConnection.playQueue(YouTubeQueue.radio(mediaMetadata), isRadio = true)
-                onDismiss()
-            }
         GridMenuItem(
             icon = Icons.AutoMirrored.Rounded.QueueMusic,
             title = R.string.add_to_queue
@@ -455,19 +440,6 @@ fun PlayerMenu(
             }
         }
 
-        if (!mediaMetadata.isLocal)
-            GridMenuItem(
-                icon = Icons.Rounded.Share,
-                title = R.string.share
-            ) {
-                val intent = Intent().apply {
-                    action = Intent.ACTION_SEND
-                    type = "text/plain"
-                    putExtra(Intent.EXTRA_TEXT, "https://music.youtube.com/watch?v=${mediaMetadata.id}")
-                }
-                context.startActivity(Intent.createChooser(intent, null))
-                onDismiss()
-            }
         GridMenuItem(
             icon = Icons.Rounded.Lyrics,
             title = R.string.toggle_lyrics

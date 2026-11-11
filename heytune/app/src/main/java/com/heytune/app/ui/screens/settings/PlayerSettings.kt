@@ -46,7 +46,6 @@ import com.heytune.app.ui.component.SwitchPreference
 import com.heytune.app.ui.component.button.IconButton
 import com.heytune.app.ui.dialog.InfoLabel
 import com.heytune.app.ui.screens.settings.fragments.AudioEffectsFrag
-import com.heytune.app.ui.screens.settings.fragments.AudioQualityFrag
 import com.heytune.app.ui.screens.settings.fragments.PlaybackBehaviourFrag
 import com.heytune.app.ui.screens.settings.fragments.PlayerGeneralFrag
 import com.heytune.app.ui.screens.settings.fragments.VoiceDrivingFrag
@@ -88,13 +87,6 @@ fun PlayerSettings(
         PreferenceGroupTitle(
             title = stringResource(R.string.grp_audio)
         )
-        ElevatedCard(
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            AudioQualityFrag()
-        }
-        Spacer(modifier = Modifier.height(16.dp))
-
         ElevatedCard(
             modifier = Modifier.fillMaxWidth()
         ) {

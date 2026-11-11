@@ -15,7 +15,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.media3.exoplayer.offline.Download
 import com.heytune.app.LocalDatabase
-import com.heytune.app.LocalDownloadUtil
 import com.heytune.app.LocalPlayerConnection
 import com.heytune.app.constants.ListThumbnailSize
 import com.heytune.app.constants.ThumbnailCornerRadius
@@ -24,7 +23,6 @@ import com.heytune.app.db.entities.Song
 import com.heytune.app.models.toMediaMetadata
 import com.heytune.app.playback.queues.ListQueue
 import com.heytune.app.ui.utils.getNSongsString
-import com.heytune.app.utils.getDownloadState
 import com.heytune.app.utils.joinByBullet
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
@@ -37,7 +35,6 @@ fun AlbumListItem(
     showLikedIcon: Boolean = true,
     badges: @Composable RowScope.() -> Unit = {
         val database = LocalDatabase.current
-        val downloadUtil = LocalDownloadUtil.current
         var songs by remember {
             mutableStateOf(emptyList<Song>())
         }
@@ -50,14 +47,6 @@ fun AlbumListItem(
 
         var downloadState by remember {
             mutableIntStateOf(Download.STATE_STOPPED)
-        }
-
-        LaunchedEffect(songs) {
-            val songs = songs.filterNot { it.song.isLocal }
-            if (songs.isEmpty()) return@LaunchedEffect
-            downloadUtil.downloads.collect { downloads ->
-                downloadState = getDownloadState(songs.map { downloads[it.id] })
-            }
         }
 
         if (showLikedIcon && album.album.bookmarkedAt != null) {
@@ -100,7 +89,6 @@ fun AlbumGridItem(
     coroutineScope: CoroutineScope,
     badges: @Composable RowScope.() -> Unit = {
         val database = LocalDatabase.current
-        val downloadUtil = LocalDownloadUtil.current
         var songs by remember {
             mutableStateOf(emptyList<Song>())
         }
@@ -113,14 +101,6 @@ fun AlbumGridItem(
 
         var downloadState by remember {
             mutableIntStateOf(Download.STATE_STOPPED)
-        }
-
-        LaunchedEffect(songs) {
-            val songs = songs.filterNot { it.song.isLocal }
-            if (songs.isEmpty()) return@LaunchedEffect
-            downloadUtil.downloads.collect { downloads ->
-                downloadState = getDownloadState(songs.map { downloads[it.id] })
-            }
         }
 
         if (album.album.bookmarkedAt != null) {

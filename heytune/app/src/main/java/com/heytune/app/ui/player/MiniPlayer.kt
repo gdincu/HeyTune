@@ -34,7 +34,6 @@ import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Replay
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -44,8 +43,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -227,8 +224,6 @@ fun MiniMediaInfo(
 ) {
     val density = LocalDensity.current
     val playerConnection = LocalPlayerConnection.current
-    val isWaitingForNetwork by playerConnection?.waitingForNetworkConnection?.collectAsState(initial = false)
-        ?: remember { mutableStateOf(false) }
 
     val px = (ListThumbnailSize.value * density.density).roundToInt()
 
@@ -250,7 +245,7 @@ fun MiniMediaInfo(
             )
 
             androidx.compose.animation.AnimatedVisibility(
-                visible = error != null || isWaitingForNetwork,
+                visible = error != null,
                 enter = fadeIn(),
                 exit = fadeOut()
             ) {
@@ -261,23 +256,13 @@ fun MiniMediaInfo(
                             shape = RoundedCornerShape(ThumbnailCornerRadius)
                         )
                 ) {
-                    if (isWaitingForNetwork) {
-                        CircularProgressIndicator(
-                            modifier = Modifier
-                                .align(Alignment.Center)
-                                .size(24.dp),
-                            strokeWidth = 2.dp,
-                            color = Color.White
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Rounded.Info,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier
-                                .align(Alignment.Center)
-                        )
-                    }
+                    Icon(
+                        imageVector = Icons.Rounded.Info,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                    )
                 }
             }
         }

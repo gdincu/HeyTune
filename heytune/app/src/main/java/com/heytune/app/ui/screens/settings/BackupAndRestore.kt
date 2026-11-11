@@ -31,14 +31,11 @@ import androidx.navigation.NavController
 import com.heytune.app.R
 import com.heytune.app.constants.TopBarInsets
 import com.heytune.app.ui.component.ColumnWithContentPadding
-import com.heytune.app.ui.component.SettingsClickToReveal
 import com.heytune.app.ui.component.button.IconButton
 import com.heytune.app.ui.dialog.InfoLabel
 import com.heytune.app.ui.screens.settings.fragments.BackupAndRestoreFrag
-import com.heytune.app.ui.screens.settings.fragments.ExportGramophoneFrag
 import com.heytune.app.ui.utils.backToMain
 import com.heytune.app.viewmodels.BackupRestoreViewModel
-import com.heytune.app.viewmodels.GramophoneExportViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,10 +55,6 @@ fun BackupAndRestore(
         InfoLabel(stringResource(R.string.import_innertune_tooltip))
         Spacer(modifier = Modifier.height(8.dp))
         InfoLabel(stringResource(R.string.restore_lm_tooltip))
-        SettingsClickToReveal(stringResource(R.string.prefs_advanced)) {
-            val viewModel2: GramophoneExportViewModel = hiltViewModel()
-            ExportGramophoneFrag(viewModel2)
-        }
     }
 
     TopAppBar(

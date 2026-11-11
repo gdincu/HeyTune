@@ -86,7 +86,6 @@ We recycle translations from upstream, they are pulled periodically. -->
     <!-- Menu -->
     <string name="details">Details</string>
     <string name="edit">Edit</string>
-    <string name="start_radio">Start radio</string>
     <string name="play">Play</string>
     <string name="play_next">Play next</string>
     <string name="add_to_queue">Add to queue</string>
@@ -102,13 +101,10 @@ We recycle translations from upstream, they are pulled periodically. -->
     <string name="view_artist">View artist</string>
     <string name="view_album">View album</string>
     <string name="refetch">Refetch</string>
-    <string name="share">Share</string>
     <string name="delete">Delete</string>
     <string name="remove_from_history">Remove from history</string>
     <string name="remove_from_playlist">Remove from playlist</string>
     <string name="remove_from_queue">Remove from queue</string>
-    <string name="search_online">Search online</string>
-    <string name="action_sync">Sync</string>
     <string name="advanced">Advanced</string>
     <string name="tempo_and_pitch">Tempo and Pitch</string>
 
@@ -128,7 +124,6 @@ We recycle translations from upstream, they are pulled periodically. -->
     <string name="codecs">Codecs</string>
     <string name="bitrate">Bitrate</string>
     <string name="sample_rate">Sample rate</string>
-    <string name="loudness">Loudness</string>
     <string name="volume">Volume</string>
     <string name="file_size">File size</string>
     <string name="unknown">Unknown</string>
@@ -193,7 +188,6 @@ We recycle translations from upstream, they are pulled periodically. -->
     <!-- Snackbar -->
     <string name="playlist_imported">Playlist imported</string>
     <string name="removed_song_from_playlist">Removed \"%s\" from playlist</string>
-    <string name="playlist_synced">Playlist synced</string>
     <string name="undo">Undo</string>
 
     <!-- Player -->
@@ -255,30 +249,11 @@ We recycle translations from upstream, they are pulled periodically. -->
     <string name="big">Big</string>
 
     <string name="content">Content</string>
-    <string name="action_logout">Log out</string>
-    <string name="action_login">Log in</string>
-    <string name="login">Login</string>
-    <string name="not_logged_in">Not logged in</string>
-    <string name="login_failed">Login failed</string>
-
-    <string name="content_language">Default content language</string>
-    <string name="content_country">Default content country</string>
-    <string name="system_default">System default</string>
-    <string name="enable_proxy">Enable proxy</string>
-    <string name="proxy_type">Proxy type</string>
-    <string name="proxy_url">Proxy URL</string>
-    <string name="restart_to_take_effect">Restart to take effect</string>
 
     <string name="player_and_audio">Player and audio</string>
-    <string name="audio_quality">Audio quality</string>
-    <string name="audio_quality_auto">Auto</string>
-    <string name="audio_quality_high">High</string>
-    <string name="audio_quality_low">Low</string>
     <string name="queue">Queue</string>
     <string name="persistent_queue">Persistent queue</string>
     <string name="persistent_queue_desc">Restore your last queue when the app starts</string>
-    <string name="auto_load_more">Auto load more songs</string>
-    <string name="auto_load_more_desc">Automatically add more songs when the end of the queue is reached, if possible</string>
     <string name="skip_silence">Skip silence</string>
     <string name="audio_normalization">Audio normalization</string>
     <string name="auto_skip_next_on_error">Auto skip to next song when error occurs</string>
@@ -318,13 +293,8 @@ We recycle translations from upstream, they are pulled periodically. -->
     <string name="pause_search_history">Pause search history</string>
     <string name="clear_search_history">Clear search history</string>
     <string name="clear_search_history_confirm">Are you sure you want to clear all search history?</string>
-    <string name="use_login_for_browse">Use login for browsing content</string>
-    <string name="use_login_for_browse_desc">This can influence what content you see and for example shows premium-only albums if you are logged in with a Premium account</string>
     <string name="disable_screenshot">Disable screenshot</string>
     <string name="disable_screenshot_desc">When this option is on, screenshots and the app\'s view in Recents are disabled.</string>
-    <string name="enable_lrclib">Enable LrcLib lyrics provider</string>
-    <string name="enable_kugou">Enable KuGou lyrics provider</string>
-    <string name="hide_explicit">Hide explicit content</string>
 
     <string name="backup_restore">Backup and restore</string>
     <string name="action_backup">Backup</string>
@@ -334,12 +304,9 @@ We recycle translations from upstream, they are pulled periodically. -->
     <string name="backup_create_failed">Couldn\'t create backup</string>
     <string name="restore_failed">Failed to restore backup</string>
 
-    <string name="discord_integration">Discord Integration</string>
-    <string name="discord_information">HeyTune uses the KizzyRPC library to set your Discord account\'s status. This involves using the Discord Gateway connection, which may be considered a violation of Discord\'s TOS. However, there are no known cases of user accounts being suspended for this reason. Use at your own risk.\n\nHeyTune will only extract your token, and everything else is stored locally.</string>
     <string name="dismiss">Dismiss</string>
     <string name="options">Options</string>
     <string name="preview">Preview</string>
-    <string name="enable_discord_rpc">Enable Rich Presence</string>
 
     <string name="about">About</string>
     <string name="app_version">App version</string>

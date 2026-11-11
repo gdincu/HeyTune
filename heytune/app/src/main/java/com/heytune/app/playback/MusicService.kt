@@ -18,13 +18,11 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.database.SQLException
 import android.media.audiofx.AudioEffect
-import android.net.ConnectivityManager
 import android.os.Binder
 import android.os.Build
 import android.util.Log
 import android.widget.Toast
 import androidx.core.content.ContextCompat
-import androidx.core.content.getSystemService
 import com.heytune.handsfree.ModelManager
 import com.heytune.handsfree.VoiceService
 import com.heytune.handsfree.CommandParser
@@ -86,7 +84,6 @@ import com.heytune.app.constants.MaxQueuesKey
 import com.heytune.app.constants.MediaSessionConstants.CommandToggleLike
 import com.heytune.app.constants.MediaSessionConstants.CommandToggleRepeatMode
 import com.heytune.app.constants.MediaSessionConstants.CommandToggleShuffle
-import com.heytune.app.constants.MediaSessionConstants.CommandToggleStartRadio
 import com.heytune.app.constants.PauseListenHistoryKey
 import com.heytune.app.constants.PersistentQueueKey
 import com.heytune.app.constants.PlayerVolumeKey
@@ -166,7 +163,6 @@ class MusicService : MediaLibraryService(),
     lateinit var mediaLibrarySessionCallback: MediaLibrarySessionCallback
 
     private val binder = MusicBinder()
-    private lateinit var connectivityManager: ConnectivityManager
 
     val qbInit = MutableStateFlow(false)
     var queueBoard = MutableStateFlow(QueueBoard(this, maxQueues = 1))
@@ -183,9 +179,6 @@ class MusicService : MediaLibraryService(),
     private lateinit var mediaSession: MediaLibrarySession
 
     // Player components
-
-    val waitingForNetworkConnection = MutableStateFlow(false)
-    private val isNetworkConnected = MutableStateFlow(true)
 
     lateinit var sleepTimer: SleepTimer
 
@@ -243,7 +236,6 @@ class MusicService : MediaLibraryService(),
         mediaLibrarySessionCallback.apply {
             service = this@MusicService
             toggleLike = ::toggleLike
-            toggleStartRadio = ::toggleStartRadio
             toggleLibrary = ::toggleLibrary
         }
 
@@ -272,8 +264,6 @@ class MusicService : MediaLibraryService(),
                 Log.w(TAG, "voice bridge install failed", e)
             }
         }, MoreExecutors.directExecutor())
-
-        connectivityManager = getSystemService()!!
 
         currentSong.collect(scope) {
             updateNotification()
@@ -359,14 +349,7 @@ class MusicService : MediaLibraryService(),
         }
     }
 
-    // TODO: local library radio playback
-    fun toggleStartRadio() {
-        val mediaMetadata = player.currentMetadata ?: return
-//        playQueue(YouTubeQueue.radio(mediaMetadata), isRadio = true)
-    }
-
-
-// Voice driving-mode fallback (Auto-only sessions)
+    // Voice driving-mode fallback (Auto-only sessions)
     /**
      * Installs a service-scoped [PlayerBridge] when the UI hasn't provided
      * one. Android Auto can start this service without ever opening
@@ -900,18 +883,8 @@ class MusicService : MediaLibraryService(),
                     .setSessionCommand(CommandToggleLike)
                     .setEnabled(currentSong.value != null)
                     .build(),
-                CommandButton.Builder(CommandButton.ICON_RADIO)
-                    .setDisplayName(getString(R.string.start_radio))
-                    .setSessionCommand(CommandToggleStartRadio)
-                    .setEnabled(currentSong.value != null)
-                    .build()
             )
         )
-    }
-
-    fun waitOnNetworkError() {
-        waitingForNetworkConnection.value = true
-        Toast.makeText(this@MusicService, getString(R.string.wait_to_reconnect), Toast.LENGTH_LONG).show()
     }
 
     fun skipOnError() {
@@ -948,14 +921,6 @@ class MusicService : MediaLibraryService(),
 
     override fun onPlayerError(error: PlaybackException) {
         super.onPlayerError(error)
-
-        // wait for reconnection
-        val isConnectionError = (error.cause?.cause is PlaybackException)
-                && (error.cause?.cause as PlaybackException).errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED
-        if (!isNetworkConnected.value || isConnectionError) {
-            waitOnNetworkError()
-            return
-        }
 
         if (dataStore.get(SkipOnErrorKey, false)) {
             skipOnError()
@@ -1075,28 +1040,6 @@ class MusicService : MediaLibraryService(),
         }
 
         // TODO: auto load more can be used for local radio
-        // Auto load more songs
-//        val q = queueBoard.value.getCurrentQueue()
-//        val songCount = q?.getSize() ?: -1
-//        val playlistId = q?.playlistId
-//        if (dataStore.get(AutoLoadMoreKey, true) &&
-//            reason != Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT &&
-//            player.mediaItemCount - player.currentMediaItemIndex <= 5 &&
-//            playlistId != null // aka "hasNext"
-//        ) {
-//            Log.d(TAG, "onMediaItemTransition: Triggering queue auto load more")
-//            scope.launch(SilentHandler) {
-//                val endpoint = playlistId // playlistId.substringBefore("\n")
-//                val continuation = null // playlistId.substringAfter("\n")
-//                val yq = YouTubeQueue(WatchEndpoint(endpoint, continuation))
-//                val mediaItems = yq.nextPage()
-//                q.playlistId = mediaItems.takeLast(4).shuffled().first().id // yq.getContinuationEndpoint()
-//                Log.d(TAG, "onMediaItemTransition: Got ${mediaItems.size} songs from radio")
-//                if (player.playbackState != STATE_IDLE && songCount > 1) { // initial radio loading is handled by playQueue()
-//                    queueBoard.value.enqueueEnd(mediaItems.drop(1))
-//                }
-//            }
-//        }
 
         queueBoard.value.setCurrQueuePosIndex(player.currentMediaItemIndex)
 
@@ -1125,9 +1068,6 @@ class MusicService : MediaLibraryService(),
                 openAudioEffectSession()
             } else {
                 closeAudioEffectSession()
-                if (!player.playWhenReady) {
-                    waitingForNetworkConnection.value = false
-                }
             }
         }
         if (events.containsAny(EVENT_TIMELINE_CHANGED, EVENT_POSITION_DISCONTINUITY)) {

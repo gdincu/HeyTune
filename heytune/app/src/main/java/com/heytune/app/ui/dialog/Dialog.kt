@@ -530,18 +530,14 @@ fun DetailsDialog(
                     stringResource(R.string.play_count) to currentPlayCount.toString()
                 )
 
-                if (!mediaMetadata.isLocal) {
-                    details.add("Itag" to currentFormat?.itag?.toString())
-                } else {
-                    mediaMetadata.trackNumber?.let {
-                        details.add(stringResource(R.string.track_number) to it.toString())
-                    }
-                    mediaMetadata.discNumber?.let {
-                        details.add(stringResource(R.string.disc_number) to it.toString())
-                    }
-                    details.add(stringResource(R.string.sort_by_date_released) to mediaMetadata.getDateString())
-                    details.add(stringResource(R.string.sort_by_date_modified) to mediaMetadata.getDateModifiedString())
+                mediaMetadata.trackNumber?.let {
+                    details.add(stringResource(R.string.track_number) to it.toString())
                 }
+                mediaMetadata.discNumber?.let {
+                    details.add(stringResource(R.string.disc_number) to it.toString())
+                }
+                details.add(stringResource(R.string.sort_by_date_released) to mediaMetadata.getDateString())
+                details.add(stringResource(R.string.sort_by_date_modified) to mediaMetadata.getDateModifiedString())
 
                 details.addAll(
                     mutableListOf(
@@ -554,14 +550,10 @@ fun DetailsDialog(
                     )
                 )
 
-                if (!mediaMetadata.isLocal) {
-                    details.add(stringResource(R.string.loudness) to currentFormat?.loudnessDb?.let { "$it dB" })
-                }
-
                 details.addAll(
                     mutableListOf(
                         stringResource(R.string.file_size) to currentFormat?.contentLength?.let {
-                            if (mediaMetadata.isLocal && mediaMetadata.localPath != null && File(mediaMetadata.localPath).exists()) {
+                            if (mediaMetadata.localPath != null && File(mediaMetadata.localPath).exists()) {
                                 Formatter.formatShortFileSize(
                                     context,
                                     File(mediaMetadata.localPath).length() * (1024 / 1000)

@@ -27,7 +27,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -38,12 +37,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.util.fastAny
-import androidx.media3.exoplayer.offline.Download
-import androidx.media3.exoplayer.offline.DownloadService
 import androidx.navigation.NavController
 import com.heytune.app.LocalDatabase
-import com.heytune.app.LocalDownloadUtil
 import com.heytune.app.LocalPlayerConnection
 import com.heytune.app.R
 import com.heytune.app.constants.M3U_EXPORT_RELATIVE_PATH
@@ -52,7 +47,6 @@ import com.heytune.app.db.entities.PlaylistSong
 import com.heytune.app.db.entities.Song
 import com.heytune.app.extensions.toMediaItem
 import com.heytune.app.models.toMediaMetadata
-import com.heytune.app.playback.ExoDownloadService
 import com.heytune.app.playback.queues.ListQueue
 import com.heytune.app.ui.component.items.PlaylistListItem
 import com.heytune.app.ui.dialog.AddToPlaylistDialog
@@ -60,7 +54,6 @@ import com.heytune.app.ui.dialog.AddToQueueDialog
 import com.heytune.app.ui.dialog.DefaultDialog
 import com.heytune.app.ui.dialog.TextFieldDialog
 import com.heytune.app.ui.utils.getNSongsString
-import com.heytune.app.utils.getDownloadState
 import com.heytune.app.utils.joinByBullet
 import com.heytune.app.utils.lmScannerCoroutine
 import com.heytune.app.utils.reportException
@@ -78,7 +71,6 @@ fun PlaylistMenu(
 ) {
     val context = LocalContext.current
     val database = LocalDatabase.current
-    val downloadUtil = LocalDownloadUtil.current
     val playerConnection = LocalPlayerConnection.current ?: return
     val queueBoard by playerConnection.queueBoard.collectAsState()
     var songs by remember {
@@ -102,16 +94,12 @@ fun PlaylistMenu(
                             val se = s.song
                             if (!M3U_EXPORT_RELATIVE_PATH) {
                                 result.append("#EXTINF:${se.duration},${s.artists.joinToString(";") { it.name }} - ${s.title}\n")
-                                if (se.isLocal) {
-                                    result.append(se.localPath)
-                                    result.append("\n")
-                                    result.append("#ot_id:${se.id}\n")
-                                } else {
-                                    result.append("https://youtube.com/watch?v=${se.id}\n")
-                                }
+                                result.append(se.localPath)
+                                result.append("\n")
+                                result.append("#ot_id:${se.id}\n")
                                 result.append("\n")
                             } else if (se.localPath != null) {
-                                // write the song path as relative to M3U. YTM songs will be ignored
+                                // write the song path as relative to M3U. Non-local songs will be ignored
                                 val localPath = se.localPath
                                 val targetPath = relativePath
 
@@ -157,16 +145,7 @@ fun PlaylistMenu(
         }
     }
 
-    var downloadState by remember {
-        mutableIntStateOf(Download.STATE_STOPPED)
-    }
-
-    val editable: Boolean = playlist.playlist.isLocal
-
     var showEditDialog by remember {
-        mutableStateOf(false)
-    }
-    var showRemoveDownloadDialog by remember {
         mutableStateOf(false)
     }
     var showDeletePlaylistDialog by remember {
@@ -178,15 +157,6 @@ fun PlaylistMenu(
     var showChoosePlaylistDialog by rememberSaveable {
         mutableStateOf(false)
     }
-
-    LaunchedEffect(songs) {
-        val songs = songs.filterNot { it.song.isLocal }
-        if (songs.isEmpty()) return@LaunchedEffect
-        downloadUtil.downloads.collect { downloads ->
-            downloadState = getDownloadState(songs.map { downloads[it.id] })
-        }
-    }
-
 
     PlaylistListItem(
         playlist = playlist,
@@ -257,26 +227,11 @@ fun PlaylistMenu(
             showChoosePlaylistDialog = true
         }
 
-        if (songs.fastAny { !it.song.isLocal }) {
-            DownloadGridMenu(
-                state = downloadState,
-                onDownload = {
-                    val _songs = songs.filterNot { it.song.isLocal }.map { it.toMediaMetadata() }
-                    downloadUtil.download(_songs)
-                },
-                onRemoveDownload = {
-                    showRemoveDownloadDialog = true
-                }
-            )
-        }
-
-        if (editable) {
-            GridMenuItem(
-                icon = Icons.Rounded.Edit,
-                title = R.string.edit
-            ) {
-                showEditDialog = true
-            }
+        GridMenuItem(
+            icon = Icons.Rounded.Edit,
+            title = R.string.edit
+        ) {
+            showEditDialog = true
         }
         GridMenuItem(
             icon = Icons.Rounded.PlaylistRemove,
@@ -285,19 +240,6 @@ fun PlaylistMenu(
             showDeletePlaylistDialog = true
         }
 
-        // TODO: m3u playlist share
-//        GridMenuItem(
-//                icon = Icons.Rounded.Share,
-//                title = R.string.share
-//        ) {
-//            val intent = Intent().apply {
-//                action = Intent.ACTION_SEND
-//                type = "text/plain"
-//                putExtra(Intent.EXTRA_TEXT, shareLink)
-//            }
-//            context.startActivity(Intent.createChooser(intent, null))
-//            onDismiss()
-//        }
         GridMenuItem(
             icon = Icons.Rounded.Output,
             title = R.string.m3u_export
@@ -336,44 +278,6 @@ fun PlaylistMenu(
      * Dialogs
      * ---------------------------
      */
-
-    if (showRemoveDownloadDialog) {
-        DefaultDialog(
-            onDismiss = { showRemoveDownloadDialog = false },
-            content = {
-                Text(
-                    text = stringResource(R.string.remove_download_playlist_confirm, playlist.playlist.name),
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.padding(horizontal = 18.dp)
-                )
-            },
-            buttons = {
-                TextButton(
-                    onClick = {
-                        showRemoveDownloadDialog = false
-                    }
-                ) {
-                    Text(text = stringResource(android.R.string.cancel))
-                }
-
-                TextButton(
-                    onClick = {
-                        showRemoveDownloadDialog = false
-                        songs.forEach { song ->
-                            DownloadService.sendRemoveDownload(
-                                context,
-                                ExoDownloadService::class.java,
-                                song.song.id,
-                                false
-                            )
-                        }
-                    }
-                ) {
-                    Text(text = stringResource(android.R.string.ok))
-                }
-            }
-        )
-    }
 
     if (showDeletePlaylistDialog) {
         DefaultDialog(

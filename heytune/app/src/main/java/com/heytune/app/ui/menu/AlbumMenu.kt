@@ -1,6 +1,5 @@
 package com.heytune.app.ui.menu
 
-import android.content.Intent
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.PaddingValues
@@ -13,7 +12,6 @@ import androidx.compose.material.icons.automirrored.rounded.PlaylistPlay
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.LibraryAdd
 import androidx.compose.material.icons.rounded.LibraryAddCheck
-import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
@@ -28,12 +26,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.heytune.app.LocalDatabase
-import com.heytune.app.LocalDownloadUtil
 import com.heytune.app.LocalPlayerConnection
 import com.heytune.app.R
 import com.heytune.app.db.entities.Album
@@ -53,9 +49,7 @@ fun AlbumMenu(
     navController: NavController,
     onDismiss: () -> Unit,
 ) {
-    val context = LocalContext.current
     val database = LocalDatabase.current
-    val downloadUtil = LocalDownloadUtil.current
     val playerConnection = LocalPlayerConnection.current ?: return
     val queueBoard by playerConnection.queueBoard.collectAsState()
     val scope = rememberCoroutineScope()
@@ -67,11 +61,6 @@ fun AlbumMenu(
     val allInLibrary = remember(songs) {
         songs.all { it.song.inLibrary != null }
     }
-
-//    TODO: for when local albums are a thing
-//    val allLocal by remember(songs) { // if only local songs in this selection
-//        mutableStateOf(songs.isNotEmpty() && songs.all { it.song.isLocal })
-//    }
 
     val coroutineScope = rememberCoroutineScope()
 
@@ -186,18 +175,6 @@ fun AlbumMenu(
             }
         }
         // TODO: share album as m3u playlist
-        GridMenuItem(
-            icon = Icons.Rounded.Share,
-            title = R.string.share
-        ) {
-            onDismiss()
-            val intent = Intent().apply {
-                action = Intent.ACTION_SEND
-                type = "text/plain"
-                putExtra(Intent.EXTRA_TEXT, "https://music.youtube.com/browse/${album.album.id}")
-            }
-            context.startActivity(Intent.createChooser(intent, null))
-        }
 
     }
 

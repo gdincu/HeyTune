@@ -53,7 +53,7 @@ fun CreatePlaylistDialog(
                             name = name,
                             path = path,
                             bookmarkedAt = LocalDateTime.now(),
-                            isLocal = true, // if we every support remote datasources
+                            isLocal = true,
                         )
                     )
                 }

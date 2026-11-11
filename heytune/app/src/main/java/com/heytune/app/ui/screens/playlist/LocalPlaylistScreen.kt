@@ -627,14 +627,6 @@ fun LocalPlaylistHeader(
         mutableIntStateOf(Download.STATE_STOPPED)
     }
 
-//    LaunchedEffect(songs) {
-//        val songs = songs.filterNot { it.song.song.isLocal }
-//        if (songs.isEmpty()) return@LaunchedEffect
-//        downloadUtil.downloads.collect { downloads ->
-//            downloadState = getDownloadState(songs.map { downloads[it.song.id] })
-//        }
-//    }
-
     Column(
         verticalArrangement = Arrangement.spacedBy(12.dp),
         modifier = modifier.padding(12.dp)

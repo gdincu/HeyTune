@@ -11,8 +11,6 @@ import androidx.compose.material.icons.automirrored.rounded.PlaylistPlay
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
-import androidx.compose.material.icons.rounded.LibraryAdd
-import androidx.compose.material.icons.rounded.LibraryAddCheck
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -45,7 +43,6 @@ import com.heytune.app.ui.dialog.AddToPlaylistDialog
 import com.heytune.app.ui.dialog.AddToQueueDialog
 import com.heytune.app.ui.dialog.DefaultDialog
 import com.heytune.app.utils.getDownloadState
-import java.time.LocalDateTime
 
 /**
  * Generic song menu
@@ -63,13 +60,6 @@ fun SelectionMediaMetadataMenu(
     val downloadUtil = LocalDownloadUtil.current
     val playerConnection = LocalPlayerConnection.current ?: return
     val queueBoard by playerConnection.queueBoard.collectAsState()
-
-    val allInLibrary by remember(selection) { // exclude local songs
-        mutableStateOf(selection.isNotEmpty() && selection.all { !it.isLocal && it.inLibrary != null })
-    }
-    val allLocal by remember(selection) { // if only local songs in this selection
-        mutableStateOf(selection.isNotEmpty() && selection.all { it.isLocal })
-    }
 
     val allLiked by remember(selection) {
         mutableStateOf(selection.isNotEmpty() && selection.all { it.liked })
@@ -160,34 +150,6 @@ fun SelectionMediaMetadataMenu(
             title = R.string.add_to_playlist
         ) {
             showChoosePlaylistDialog = true
-        }
-
-        if (!allLocal) {
-            if (allInLibrary) {
-                GridMenuItem(
-                    icon = Icons.Rounded.LibraryAddCheck,
-                    title = R.string.remove_all_from_library
-                ) {
-                    database.transaction {
-                        selection.forEach { song ->
-                            toggleInLibrary(song.id, null)
-                        }
-                    }
-                }
-            } else {
-                GridMenuItem(
-                    icon = Icons.Rounded.LibraryAdd,
-                    title = R.string.add_all_to_library
-                ) {
-                    database.transaction {
-                        selection.forEach { song ->
-                            if (!song.isLocal) {
-                                toggleInLibrary(song.id, LocalDateTime.now())
-                            }
-                        }
-                    }
-                }
-            }
         }
 
         GridMenuItem(

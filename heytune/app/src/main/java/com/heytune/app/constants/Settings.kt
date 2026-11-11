@@ -83,9 +83,6 @@ enum class SeekIncrement(val millisec: Int, val second: Int) {
 
     }
 }
-enum class AudioQuality {
-    AUTO, HIGH, LOW
-}
 
 /*
 ---------------------------

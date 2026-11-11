@@ -114,7 +114,6 @@ import com.heytune.app.ui.component.items.SongListItem
 import com.heytune.app.ui.dialog.DefaultDialog
 import com.heytune.app.ui.utils.backToMain
 import com.heytune.app.ui.utils.getNSongsString
-import com.heytune.app.utils.getDownloadState
 import com.heytune.app.utils.makeTimeString
 import com.heytune.app.utils.rememberEnumPreference
 import com.heytune.app.utils.rememberPreference
@@ -239,11 +238,6 @@ fun AutoPlaylistScreen(
         mutableSongs.apply {
             clear()
             addAll(songs)
-        }
-        val songs = songs.filterNot { it.song.isLocal }
-        if (songs.isEmpty()) return@LaunchedEffect
-        downloadUtil.downloads.collect { downloads ->
-            downloadState = getDownloadState(songs.map { downloads[it.id] })
         }
     }
 

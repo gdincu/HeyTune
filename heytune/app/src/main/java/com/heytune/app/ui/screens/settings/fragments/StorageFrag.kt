@@ -79,7 +79,6 @@ import com.heytune.app.utils.scanners.absoluteFilePathFromUri
 import com.heytune.app.utils.scanners.stringFromUriList
 import com.heytune.app.utils.scanners.uriListFromString
 import com.heytune.app.viewmodels.BackupRestoreViewModel
-import com.heytune.app.viewmodels.GramophoneExportViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -132,49 +131,6 @@ fun ColumnScope.BackupAndRestoreFrag(viewModel: BackupRestoreViewModel) {
                 restoreLauncher.launch(arrayOf("application/octet-stream"))
             }
         )
-    }
-}
-
-@Composable
-fun ColumnScope.ExportGramophoneFrag(viewModel: GramophoneExportViewModel) {
-    val exportLauncher =
-        rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
-            if (uri != null) {
-                viewModel.backup(uri, true)
-            }
-        }
-
-    val progress by viewModel.backupProgressTotal.collectAsState()
-    val lock by viewModel.lock.collectAsState()
-
-    ElevatedCard(
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        PreferenceEntry(
-            title = { Text("Export Gramophone database") },
-            icon = { Icon(Icons.Rounded.Backup, null) },
-            onClick = {
-                val formatter = DateTimeFormatter.ofPattern("yyyyMMddHHmmss")
-                exportLauncher.launch(
-                    "Gramophone_${MusicDatabase.MUSIC_DATABASE_VERSION}_${
-                        LocalDateTime.now().format(formatter)
-                    }.backup"
-                )
-            }
-        )
-        if ((lock || progress != 0f) && progress < 1f) {
-            LinearProgressIndicator(
-                progress = { progress },
-                modifier = Modifier
-                    .fillMaxWidth()
-            )
-        }
-        if (progress == 1f) {
-            Text(
-                text = stringResource(R.string.export_success),
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-            )
-        }
     }
 }
 

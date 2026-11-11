@@ -143,17 +143,12 @@ fun HomeScreen(
                                 playerConnection.player.togglePlayPause()
                             } else {
                                 val song = it.toMediaMetadata()
-                                if (song.isLocal) {
-                                    playerConnection.playQueue(
-                                        ListQueue(
-                                            title = source,
-                                            items = listOf(song)
-                                        )
+                                playerConnection.playQueue(
+                                    ListQueue(
+                                        title = source,
+                                        items = listOf(song)
                                     )
-                                } else {
-                                    // TODO: local library radio playback
-
-                                }
+                                )
                             }
                         },
                         onLongClick = {

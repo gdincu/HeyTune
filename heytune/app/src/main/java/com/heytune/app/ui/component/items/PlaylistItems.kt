@@ -15,10 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.PlaylistPlay
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
-import androidx.compose.material.icons.rounded.EditOff
-import androidx.compose.material.icons.rounded.OfflinePin
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
@@ -123,15 +120,6 @@ fun PlaylistListItem(
     badges = {
         PlaylistIcon(playlist.playlist) // always show
         if (!showBadges) return@ListItem
-        if (!playlist.playlist.isLocal) {
-            Icon(
-                imageVector = Icons.Rounded.EditOff,
-                contentDescription = null,
-                modifier = Modifier
-                    .size(18.dp)
-                    .padding(end = 2.dp)
-            )
-        }
 
         if (playlist.downloadCount > 0) {
             Icon(
@@ -216,7 +204,7 @@ fun PlaylistThumbnail(
             )
         } else {
             Icon(
-                imageVector = if (playlist.isLocal) Icons.AutoMirrored.Rounded.QueueMusic else Icons.AutoMirrored.Rounded.PlaylistPlay,
+                imageVector = Icons.AutoMirrored.Rounded.QueueMusic,
                 contentDescription = null,
                 tint = iconTint,
                 modifier = Modifier

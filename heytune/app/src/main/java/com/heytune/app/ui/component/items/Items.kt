@@ -33,7 +33,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.PlaylistPlay
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.Cloud
 import androidx.compose.material.icons.rounded.CloudOff
@@ -47,8 +46,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -67,7 +64,6 @@ import androidx.compose.ui.unit.dp
 import androidx.media3.exoplayer.offline.Download.STATE_COMPLETED
 import androidx.media3.exoplayer.offline.Download.STATE_DOWNLOADING
 import androidx.media3.exoplayer.offline.Download.STATE_QUEUED
-import com.heytune.app.LocalDownloadUtil
 import com.heytune.app.R
 import com.heytune.app.constants.GridThumbnailHeight
 import com.heytune.app.constants.ListItemHeight
@@ -309,10 +305,6 @@ fun MediaMetadataListItem(
         if (showLikedIcon && mediaMetadata.liked) {
             Icon.Favorite()
         }
-        if (!mediaMetadata.isLocal && showDownloadIcon) {
-            val download by LocalDownloadUtil.current.getDownload(mediaMetadata.id).collectAsState(initial = null)
-            Icon.Download(download)
-        }
 
     },
     thumbnailContent = {
@@ -541,7 +533,7 @@ object Icon {
     @Composable
     fun PlaylistIcon(playlist: PlaylistEntity) {
         Icon(
-            imageVector = if (playlist.isLocal) Icons.AutoMirrored.Rounded.QueueMusic else Icons.AutoMirrored.Rounded.PlaylistPlay,
+            imageVector = Icons.AutoMirrored.Rounded.QueueMusic,
             contentDescription = null,
             modifier = Modifier
                 .size(18.dp)

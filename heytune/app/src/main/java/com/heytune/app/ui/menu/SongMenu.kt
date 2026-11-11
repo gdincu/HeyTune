@@ -1,6 +1,5 @@
 package com.heytune.app.ui.menu
 
-import android.content.Intent
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -19,8 +18,6 @@ import androidx.compose.material.icons.rounded.LibraryAdd
 import androidx.compose.material.icons.rounded.LibraryAddCheck
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.PlaylistRemove
-import androidx.compose.material.icons.rounded.Radio
-import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
@@ -43,11 +40,9 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastSumBy
-import androidx.media3.exoplayer.offline.DownloadService
 import androidx.navigation.NavController
 import coil3.compose.AsyncImage
 import com.heytune.app.LocalDatabase
-import com.heytune.app.LocalDownloadUtil
 import com.heytune.app.LocalPlayerConnection
 import com.heytune.app.R
 import com.heytune.app.constants.ListThumbnailSize
@@ -58,7 +53,6 @@ import com.heytune.app.db.entities.PlaylistSong
 import com.heytune.app.db.entities.Song
 import com.heytune.app.extensions.toMediaItem
 import com.heytune.app.models.toMediaMetadata
-import com.heytune.app.playback.ExoDownloadService
 import com.heytune.app.playback.queues.ListQueue
 import com.heytune.app.ui.component.button.IconButton
 import com.heytune.app.ui.component.items.ListItem
@@ -83,13 +77,11 @@ fun SongMenu(
     val context = LocalContext.current
     val database = LocalDatabase.current
     val density = LocalDensity.current
-    val downloadUtil = LocalDownloadUtil.current
     val clipboardManager = LocalClipboard.current
     val playerConnection = LocalPlayerConnection.current ?: return
     val queueBoard by playerConnection.queueBoard.collectAsState()
 
     val song = originalSong
-    val download by LocalDownloadUtil.current.getDownload(originalSong.id).collectAsState(initial = null)
 
     val currentFormatState = database.format(originalSong.id).collectAsState(initial = null)
     val currentFormat = currentFormatState.value
@@ -154,16 +146,6 @@ fun SongMenu(
             bottom = 8.dp + WindowInsets.systemBars.asPaddingValues().calculateBottomPadding()
         )
     ) {
-        // TODO: local library radio playback
-        if (!song.song.isLocal)
-            GridMenuItem(
-                icon = Icons.Rounded.Radio,
-                title = R.string.start_radio
-            ) {
-                onDismiss()
-//                playerConnection.playQueue(YouTubeQueue.radio(song.toMediaMetadata()), isRadio = true)
-            }
-
         GridMenuItem(
             icon = Icons.Rounded.PlayArrow,
             title = R.string.play
@@ -202,8 +184,7 @@ fun SongMenu(
             showChoosePlaylistDialog = true
         }
 
-        if (playlistSong != null && (playlist?.playlist?.isLocal == true || (playlistSong.song.song.isLocal))
-        ) {
+        if (playlistSong != null) {
             GridMenuItem(
                 icon = Icons.Rounded.PlaylistRemove,
                 title = R.string.remove_from_playlist
@@ -216,27 +197,6 @@ fun SongMenu(
                 onDismiss()
             }
         }
-
-        if (!song.song.isLocal)
-            DownloadGridMenu(
-                localDateTime = download,
-                onDownload = {
-                    downloadUtil.download(song.toMediaMetadata())
-                },
-                onRemoveDownload = {
-                    if (song.song.localPath != null) {
-                        downloadUtil.delete(song)
-                    } else {
-                        DownloadService.sendRemoveDownload(
-                            context,
-                            ExoDownloadService::class.java,
-                            song.id,
-                            false
-                        )
-                    }
-                }
-            )
-
 
         GridMenuItem(
             icon = R.drawable.artist,
@@ -258,19 +218,6 @@ fun SongMenu(
                 navController.navigate("album/${song.song.albumId}")
             }
         }
-        if (!song.song.isLocal)
-            GridMenuItem(
-                icon = Icons.Rounded.Share,
-                title = R.string.share
-            ) {
-                onDismiss()
-                val intent = Intent().apply {
-                    action = Intent.ACTION_SEND
-                    type = "text/plain"
-                    putExtra(Intent.EXTRA_TEXT, "https://music.youtube.com/watch?v=${song.id}")
-                }
-                context.startActivity(Intent.createChooser(intent, null))
-            }
         GridMenuItem(
             icon = Icons.Rounded.Info,
             title = R.string.details

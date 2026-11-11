@@ -60,7 +60,6 @@ const val SYSTEM_DEFAULT = "SYSTEM_DEFAULT"
  * Player & audio
  */
 val AudioDecoderKey = intPreferencesKey("audioDecoder")
-val AudioQualityKey = stringPreferencesKey("audioQuality")
 val AudioOffloadKey = booleanPreferencesKey("enableOffload")
 val AudioGaplessOffloadKey = booleanPreferencesKey("enableGaplessOffload")
 
@@ -71,7 +70,6 @@ val SeekIncrementKey = stringPreferencesKey("seekIncrement")
 val SkipSilenceKey = booleanPreferencesKey("skipSilence")
 val SkipOnErrorKey = booleanPreferencesKey("skipOnError")
 val AudioNormalizationKey = booleanPreferencesKey("audioNormalization")
-val AutoLoadMoreKey = booleanPreferencesKey("autoLoadMore")
 val KeepAliveKey = booleanPreferencesKey("keepAlive")
 val StopMusicOnTaskClearKey = booleanPreferencesKey("stopMusicOnTaskClear")
 

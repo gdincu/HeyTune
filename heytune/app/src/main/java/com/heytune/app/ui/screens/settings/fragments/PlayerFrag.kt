@@ -2,10 +2,8 @@ package com.heytune.app.ui.screens.settings.fragments
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
-import androidx.compose.material.icons.rounded.Autorenew
 import androidx.compose.material.icons.rounded.ClearAll
 import androidx.compose.material.icons.rounded.FastForward
-import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material3.Icon
@@ -20,9 +18,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import com.heytune.app.R
 import com.heytune.app.constants.AudioNormalizationKey
-import com.heytune.app.constants.AudioQuality
-import com.heytune.app.constants.AudioQualityKey
-import com.heytune.app.constants.AutoLoadMoreKey
 import com.heytune.app.constants.KeepAliveKey
 import com.heytune.app.constants.SeekIncrement
 import com.heytune.app.constants.SeekIncrementKey
@@ -39,21 +34,12 @@ import com.heytune.app.utils.rememberPreference
 
 @Composable
 fun PlayerGeneralFrag() {
-    val (autoLoadMore, onAutoLoadMoreChange) = rememberPreference(AutoLoadMoreKey, defaultValue = true)
-
     val context = LocalContext.current
     val (seekIncrement, onSeekIncrementChange) = rememberEnumPreference(
         key = SeekIncrementKey,
         defaultValue = SeekIncrement.OFF
     )
 
-    SwitchPreference(
-        title = { Text(stringResource(R.string.auto_load_more)) },
-        description = stringResource(R.string.auto_load_more_desc),
-        icon = { Icon(Icons.Rounded.Autorenew, null) },
-        checked = autoLoadMore,
-        onCheckedChange = onAutoLoadMoreChange
-    )
     EnumListPreference(
         title = { Text(stringResource(R.string.seek_increment))},
         icon = { Icon(Icons.Rounded.FastForward, null) },
@@ -63,29 +49,6 @@ fun PlayerGeneralFrag() {
             seekIncrement -> SeekIncrement.getString(context, seekIncrement)
         }
     )
-}
-
-@Composable
-fun AudioQualityFrag() {
-    val (audioQuality, onAudioQualityChange) = rememberEnumPreference(
-        key = AudioQualityKey,
-        defaultValue = AudioQuality.AUTO
-    )
-
-    EnumListPreference(
-        title = { Text(stringResource(R.string.audio_quality)) },
-        icon = { Icon(Icons.Rounded.GraphicEq, null) },
-        selectedValue = audioQuality,
-        onValueSelected = onAudioQualityChange,
-        valueText = {
-            when (it) {
-                AudioQuality.AUTO -> stringResource(R.string.audio_quality_auto)
-                AudioQuality.HIGH -> stringResource(R.string.audio_quality_high)
-                AudioQuality.LOW -> stringResource(R.string.audio_quality_low)
-            }
-        }
-    )
-
 }
 
 @Composable

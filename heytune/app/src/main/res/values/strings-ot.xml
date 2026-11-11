@@ -50,7 +50,6 @@ while also allowing users to translate our app as well. New, specific strings to
     <string name="err_play_next_on_error">Error occurred. Playing next</string>
     <string name="err_stop_on_error">Error occurred. Playback stopped</string>
     <string name="err_stop_on_too_many_errors">Too many errors. Playback stopped</string>
-    <string name="wait_to_reconnect">Wait to reconnect</string>
 
 <!-- Sort menu -->
     <string name="sort_by_date_modified">Date modified</string>
@@ -230,10 +229,6 @@ while also allowing users to translate our app as well. New, specific strings to
     <string name="scanner_progress_syncing">Syncing…</string>
 	<string name="scanner_scan_fail">Scanner failed</string>
 
-	<string name="scanner_ytm_link_fail">YouTube artist linking job failed</string>
-	<string name="scanner_ytm_link_start">Starting YouTube artist linking…</string>
-	<string name="scanner_ytm_link_success">YouTube artist linking job complete</string>
-
     <plurals name="scanner_n_song_processed">
         <item quantity="one">%d song processed</item>
         <item quantity="other">%d songs processed</item>
@@ -297,7 +292,6 @@ while also allowing users to translate our app as well. New, specific strings to
     <string name="err_restore_incompatible_database">Could not restore incompatible database</string>
     <string name="import_innertune_tooltip">Restoring InnerTune backups are supported, albeit a possibility of anomalies due to technical limitations. Forks are NOT supported.</string>
 	<string name="restore_lm_tooltip">For fresh installs of the app, custom download and local media scan paths may not work. To resolve this, remove and add them again.</string>
-    <string name="export_success">Exported successfully</string>
 
 <!-- Experimental settings -->
     <string name="experimental_settings_title">Experimental</string>
@@ -352,7 +346,6 @@ while also allowing users to translate our app as well. New, specific strings to
     <string name="m3u_import_failed"> "No songs found. Invalid M3U file, or no song matches were found"</string>
     <string name="m3u_import_playlist">Import a playlist (m3u)</string>
     <string name="m3u_import_playlist_failed">Failed to import</string>
-    <string name="m3u_ytm_lookup">Search on YouTube Music for songs not found in the app database</string>
 
 <!-- Misc -->
     <string name="action_back">Back</string>

@@ -132,10 +132,6 @@ fun SongListItem(
                 if (showLikedIcon && song.song.liked) {
                     Icon.Favorite()
                 }
-                if (!song.song.isLocal && showDownloadIcon) {
-                    val download by LocalDownloadUtil.current.getDownload(song.id).collectAsState(initial = null)
-                    Icon.Download(download)
-                }
             },
             thumbnailContent = {
                 if (showThumbnail) {
