@@ -1,10 +1,11 @@
-// JNI bridge for the Cactus C++ engine (libneedle.a + needle.h).
+// JNI bridge for the Cactus C++ engine (libcactus.a + cactus.h,
+// legacy name libneedle.a + needle.h).
 //
-// Real API (see downloaded needle.h):
-//   needle_load(cact_bytes, n)      per .cact (buffers must stay alive)
-//   needle_init(sys, tools_json, idx)
-//   needle_set_audio(lang, kw, ts) / needle_complete(input, pcm, n, max, out, cap)
-//   needle_transcribe(pcm, n, lang, kw, ts, out, cap)   (JSON via out buffer)
+// Real API (see downloaded cactus.h; Cactus 4 renamed needle_* -> cactus_*):
+//   cactus_load(cact_bytes, n)      per .cact (buffers must stay alive)
+//   cactus_init(sys, tools_json, idx)
+//   cactus_set_audio(lang, kw, ts) / cactus_complete(input, pcm, n, max, out, cap)
+//   cactus_transcribe(pcm, n, lang, kw, ts, out, cap)   (JSON via out buffer)
 // Results cross JNI as UTF-8 byte[] and are parsed with org.json in Kotlin.
 //
 // Stub builds (ABI without a prebuilt engine, e.g. x86_64): HANDSFREE_STUB
@@ -18,7 +19,20 @@
 #include <vector>
 
 #ifndef HANDSFREE_STUB
+#if __has_include("cactus.h")
+#include "cactus.h"
+// Back-compat aliases: the body below still calls needle_*.
+#define needle_load cactus_load
+#define needle_models cactus_models
+#define needle_init cactus_init
+#define needle_set_audio cactus_set_audio
+#define needle_complete cactus_complete
+#define needle_transcribe cactus_transcribe
+#define NEEDLE_TEXT CACTUS_TEXT
+#define NEEDLE_SPEECH CACTUS_SPEECH
+#else
 #include "needle.h"
+#endif
 
 namespace {
 

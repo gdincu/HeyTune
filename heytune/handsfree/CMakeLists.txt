@@ -2,9 +2,11 @@ cmake_minimum_required(VERSION 3.22)
 project(needle_bridge)
 
 # Prebuilt Cactus engine: download once per ABI with
-#   needle download android-arm64 --out <ENGINE_DIR>/android-arm64
-#   needle download android-armv7  --out <ENGINE_DIR>/android-armv7
-# which provides libneedle.a + needle.h per Cactus platform folder.
+#   cactus download android-arm64 --out <ENGINE_DIR>/android-arm64
+#   cactus download android-armv7  --out <ENGINE_DIR>/android-armv7
+# which provides libcactus.a + cactus.h per Cactus platform folder
+# (Cactus 4 renamed libneedle.a/needle.h -> libcactus.a/cactus.h;
+#  the old names are still accepted as a fallback).
 if(NOT DEFINED NEEDLE_ENGINE_DIR)
   set(NEEDLE_ENGINE_DIR "${CMAKE_SOURCE_DIR}/engine")
 endif()
@@ -37,15 +39,24 @@ endif()
 if(CACTUS_ABI)
   target_include_directories(needle_bridge PRIVATE ${NEEDLE_ENGINE_DIR}/${CACTUS_ABI})
 
-  # libneedle.a ships per-ABI next to needle.h in the platform folder.
+  # libcactus.a ships per-ABI next to cactus.h in the platform folder.
   # Use an explicit path (not find_library): the file is staged by CI
-  # (`needle download`) and must exist at configure time.
-  set(NEEDLE_LIB "${NEEDLE_ENGINE_DIR}/${CACTUS_ABI}/libneedle.a")
-  if(EXISTS "${NEEDLE_LIB}")
+  # (`cactus download`) and must exist at configure time.
+  # Accept the legacy libneedle.a name as a fallback.
+  set(NEEDLE_LIB "")
+  foreach(_candidate
+      "${NEEDLE_ENGINE_DIR}/${CACTUS_ABI}/libcactus.a"
+      "${NEEDLE_ENGINE_DIR}/${CACTUS_ABI}/libneedle.a")
+    if(EXISTS "${_candidate}")
+      set(NEEDLE_LIB "${_candidate}")
+      break()
+    endif()
+  endforeach()
+  if(NEEDLE_LIB)
     message(STATUS "Linking prebuilt engine: ${NEEDLE_LIB}")
     target_link_libraries(needle_bridge ${NEEDLE_LIB} log)
   else()
-    message(WARNING "libneedle.a not found in ${NEEDLE_ENGINE_DIR}/${CACTUS_ABI}; run the engine download step first.")
+    message(WARNING "libcactus.a (or legacy libneedle.a) not found in ${NEEDLE_ENGINE_DIR}/${CACTUS_ABI}; run the engine download step first.")
     target_link_libraries(needle_bridge log)
   endif()
 else()

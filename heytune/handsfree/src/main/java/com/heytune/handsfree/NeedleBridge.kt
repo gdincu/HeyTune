@@ -3,7 +3,7 @@ package com.heytune.handsfree
 import org.json.JSONObject
 
 /**
- * JNI boundary for the Cactus C++ engine (libneedle.a + needle.h).
+ * JNI boundary for the Cactus C++ engine (libcactus.a + cactus.h).
  *
  * The native lib loads whichever .cact it is given:
  *  - whistle.cact  -> NEEDLE_SPEECH
