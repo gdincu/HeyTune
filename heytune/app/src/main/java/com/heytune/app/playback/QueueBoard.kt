@@ -398,22 +398,23 @@ class QueueBoard(
 
         if (item.shuffled) {
             Log.d(TAG, "Trying remove song at index: $index")
-            val s = item.queue.find { it.shuffleIndex == index }
-            if (s != null) {
-                ret = item.queue.remove(s)
-                Log.d(TAG, "Removing song: ${s.title}, $ret")
-            }
+            val s = item.queue.find { it.shuffleIndex == index } ?: return false
+            ret = item.queue.remove(s)
+            Log.d(TAG, "Removing song: ${s.title}, $ret")
+            if (!ret) return false
         } else {
+            if (index < 0 || index >= item.queue.size) return false
             item.queue.removeAt(index)
             ret = true
         }
         item.getCurrentQueueShuffled().fastForEachIndexed { index, s -> s.shuffleIndex = index }
 
-        // update current position only if the move will affect it
+        // update current position only if the removal affects it
         if (index < currentMediaItemIndex) {
             newQueuePos--
         } else if (index == currentMediaItemIndex) {
-            newQueuePos++
+            // The next song slides into this timeline slot and keeps playing;
+            // hold position (clamped below) so it isn't skipped.
         } else {
             // no need to adjust
         }
@@ -678,13 +679,15 @@ class QueueBoard(
         if (queue.shuffled) {
             items.move(fromIndex, toIndex)
             items.fastForEachIndexed { index, s ->
-                // items is a copy of queue.queue, assume all objects will exist *once* only
-                queue.queue.find { it == s }?.shuffleIndex = index
+                // items holds the same object refs as queue.queue: match by
+                // referential identity so duplicate local songs (same metadata)
+                // update the moved entry, not the first structural equal one.
+                queue.queue.find { it === s }?.shuffleIndex = index
             }
         } else {
             queue.queue.move(fromIndex, toIndex)
+            queue.queue.fastForEachIndexed { index, s -> s.shuffleIndex = index }
         }
-        queue.getCurrentQueueShuffled().fastForEachIndexed { index, s -> s.shuffleIndex = index }
 
         saveQueueSongs(queue)
 

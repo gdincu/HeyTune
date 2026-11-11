@@ -378,24 +378,6 @@ class MainActivity : ComponentActivity() {
                     )
 
                     // TODO: can i use this for external file explorer media player?
-//                    DisposableEffect(Unit) {
-//                        val listener = Consumer<Intent> { intent ->
-//                            val uri =
-//                                intent.data ?: intent.extras?.getString(Intent.EXTRA_TEXT)?.toUri()
-//                                ?: return@Consumer
-//                            youtubeNavigator(
-//                                this@MainActivity,
-//                                navController,
-//                                coroutineScope,
-//                                playerConnection,
-//                                snackbarHostState,
-//                                uri
-//                            )
-//                        }
-//
-//                        addOnNewIntentListener(listener)
-//                        onDispose { removeOnNewIntentListener(listener) }
-//                    }
 
                     CompositionLocalProvider(
                         LocalDatabase provides database,
@@ -692,10 +674,6 @@ class MainActivity : ComponentActivity() {
                                                         "scrollToTop",
                                                         true
                                                     )
-                                                } else if (navigationItems.none { scr -> navBackStackEntry?.destination?.hierarchy?.any { it.route == scr.route } == true }) {
-                                                    // this eye bleach allows you to navigate back when you tap on the navbar on a non-root page
-                                                    // TODO: nav3 allows us to access back stack... maybe do indicators properly and remove this hack
-                                                    navController.navigateUp()
                                                 } else {
                                                     navController.navigate(screen.route) {
                                                         popUpTo(navController.graph.startDestinationId) {

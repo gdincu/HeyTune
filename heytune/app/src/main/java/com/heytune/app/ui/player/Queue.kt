@@ -730,18 +730,32 @@ fun BoxScope.QueueContent(
                         confirmValueChange = { dismissValue ->
                             when (dismissValue) {
                                 SwipeToDismissBoxValue.StartToEnd -> {
-                                    if (qb.removeCurrentQueueSong(index)) {
-                                        playerConnection.player.removeMediaItem(index)
-                                        mutableSongs.removeAt(index)
+                                    // `index` is into the displayed (possibly filtered) list;
+                                    // map it back to the real queue/player position.
+                                    val window = (if (isSearching) filteredSongs else mutableSongs).getOrNull(index)
+                                    val actualIndex = window?.let { w ->
+                                        mutableSongs.indexOfFirst { it === w }.takeIf { it >= 0 }
+                                            ?: mutableSongs.indexOf(w).takeIf { it >= 0 }
+                                    } ?: index
+                                    if (actualIndex in 0 until mutableSongs.size && qb.removeCurrentQueueSong(actualIndex)) {
+                                        playerConnection.player.removeMediaItem(actualIndex)
+                                        mutableSongs.removeAt(actualIndex)
                                     }
                                     haptic.performHapticFeedback(HapticFeedbackType.Confirm)
                                     return@rememberSwipeToDismissBoxState true
                                 }
 
                                 SwipeToDismissBoxValue.EndToStart -> {
-                                    if (qb.removeCurrentQueueSong(index)) {
-                                        playerConnection.player.removeMediaItem(index)
-                                        mutableSongs.removeAt(index)
+                                    // `index` is into the displayed (possibly filtered) list;
+                                    // map it back to the real queue/player position.
+                                    val window = (if (isSearching) filteredSongs else mutableSongs).getOrNull(index)
+                                    val actualIndex = window?.let { w ->
+                                        mutableSongs.indexOfFirst { it === w }.takeIf { it >= 0 }
+                                            ?: mutableSongs.indexOf(w).takeIf { it >= 0 }
+                                    } ?: index
+                                    if (actualIndex in 0 until mutableSongs.size && qb.removeCurrentQueueSong(actualIndex)) {
+                                        playerConnection.player.removeMediaItem(actualIndex)
+                                        mutableSongs.removeAt(actualIndex)
                                     }
                                     haptic.performHapticFeedback(HapticFeedbackType.Confirm)
                                     return@rememberSwipeToDismissBoxState true
